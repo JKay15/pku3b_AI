@@ -1,0 +1,20 @@
+[package]
+name = "pku3b_py"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "pku3b_py"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.25", features = ["extension-module"] }
+serde = "1.0"
+serde_json = "1.0"
+pku3b = { workspace = true }   # 从此不写硬路径
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+compio = { version = "0.14", features = ["macros", "process"] }
+anyhow = "1.0"           # ← 新增这一行
+
+[features]
+extension-module = ["pyo3/extension-module"]

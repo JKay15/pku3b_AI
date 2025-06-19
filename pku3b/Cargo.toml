@@ -1,0 +1,91 @@
+[package]
+name = "pku3b"
+version = "0.8.1"
+edition = "2024"
+authors = ["Weiyao Huang <jy.cat@qq.com>"]
+license = "MIT"
+description = "A tool for PKU students to check their courses."
+readme = "README.md"
+homepage = "https://github.com/sshwy/pku3b"
+repository = "https://github.com/sshwy/pku3b"
+keywords = ["cli"]
+categories = ["command-line-utilities"]
+exclude = ["/assets"]
+build = "build.rs"
+
+[dependencies]
+aes = { version = "0.8.4", optional = true }
+anyhow = { version = "1.0", default-features = false }
+bytes = { version = "1.10", default-features = false }
+cbc = { version = "0.1.2", optional = true, features = ["std"] }
+chrono = { version = "0.4.40", default-features = false, features = ["clock"] }
+clap = { version = "4.5.31", features = ["derive"] }
+compio = { version = "0.14", features = [
+    "macros",
+    "process",
+], default-features = false }
+cyper = { version = "0.3.0", default-features = false, features = [
+    "cookies",
+    "rustls",
+] }
+directories = "6.0.0"
+env_logger = { version = "0.11.6", features = [
+    "auto-color",
+], default-features = false }
+futures-channel = "0.3.31"
+futures-util = { version = "0.3.31", features = [
+    "alloc",
+    "async-await-macro",
+], default-features = false }
+http = { version = "1.2.0", default-features = false }
+indicatif = "0.17.11"
+inquire = { version = "0.7.5", features = ["crossterm", "macros"], default-features = false }
+itertools = "0.14.0"
+log = "0.4.26"
+m3u8-rs = { version = "6.0.0", optional = true }
+memchr = "2.7.4"
+rand = { version = "0.9.0", features = [
+    "thread_rng",
+], default-features = false }
+regex = "1.11.1"
+rustls = "0.23.23"
+scraper = { version = "0.23.1", default-features = false }
+serde = { version = "1.0", features = [
+    "serde_derive",
+], default-features = false }
+serde_json = "1.0"
+shadow-rs = { version = "1.0.1", features = [
+    "build",
+], default-features = false }
+toml = "0.8"
+url = "2.5.4"
+
+[build-dependencies]
+shadow-rs = { version = "1.0.1", features = [
+    "build",
+], default-features = false }
+
+[features]
+dev = []
+default = ["video-download"]
+
+# support for downloading videos
+aes = ["dep:aes"]
+cbc = ["dep:cbc"]
+m3u8-rs = ["dep:m3u8-rs"]
+video-download = ["m3u8-rs", "aes", "cbc"]
+
+[profile.release]
+lto = true
+codegen-units = 1
+
+[target.'cfg(hyper_unstable_tracing)'.dependencies]
+tracing = { version = "0.1.41" }
+tracing-subscriber = { version = "^0.3.16", features = ["env-filter"] }
+
+[lints.rust.unexpected_cfgs]
+level = "allow"
+check-cfg = ['cfg(hyper_unstable_tracing)']
+[lib]
+name = "pku3b"
+path = "src/lib.rs"

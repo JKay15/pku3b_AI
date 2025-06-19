@@ -1,0 +1,7 @@
+[workspace]
+members = ["pku3b", "pku3b_py"]
+resolver = "2"
+
+
+[workspace.dependencies]
+pku3b = { path = "pku3b" }
