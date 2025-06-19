@@ -1,35 +1,71 @@
 name: Rust + Python CI
 
-on: [push, pull_request]   # 每次 push / PR 都跑
+# 什么时候触发
+on:
+  push:
+    branches: [ main ]
+  pull_request:
 
 jobs:
   build:
-    runs-on: ubuntu-latest  # GitHub 提供的免费 Linux 虚机
+    runs-on: ubuntu-latest
+
+    # 如果以后想一次性测多个 Python 版本，只要把下面的列表加上 '3.11' 等即可
+    strategy:
+      matrix:
+        python-version: ['3.12']
+
     steps:
-      # 1. 拉代码
+      # ① 拉代码
       - uses: actions/checkout@v4
 
-      # 2. 安装 Rust stable
-      - uses: actions-rs/toolchain@v1
+      # ② 安装 Rust（稳定版）+ clippy（可选）
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
-          profile: minimal
-          override: true
+          components: clippy
 
-      # 3. 安装 Python 3.12 + maturin
-      - uses: actions/setup-python@v5
+      # ③ 缓存 Cargo 依赖，加速构建
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
         with:
-          python-version: "3.12"
-      - run: pip install maturin
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
 
-      # 4. 跑 Rust 单元测试
-      - run: cargo test --workspace --all-features --locked
+      # ④ 构建 & 运行 Rust 单元测试
+      - name: cargo test
+        run: cargo test --workspace --all-features
 
-      # 5. 编译 Py3 模块并简单 import 一下
-      - run: |
+      # ⑤ 安装指定版本 Python
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      # ⑥ 安装 maturin（用来把 Rust 打成 Python wheel）
+      - name: Install maturin
+        run: pip install maturin
+
+      # ⑦ 在 pku3b_py 目录里编译 wheel（不需要 virtualenv）
+      - name: Build wheel with maturin
+        run: |
           cd pku3b_py
-          maturin develop --quiet
+          maturin build --release --interpreter python${{ matrix.python-version }}
+
+      # ⑧ 装好 wheel，确保 import 没问题
+      - name: Install wheel
+        run: |
+          pip install pku3b_py/target/wheels/*.whl
+
+      # ⑨ 简单跑一个 “能 import 就 OK” 的 smoke test
+      - name: Python import smoke-test
+        run: |
           python - <<'PY'
-          import pku3b_py, sys
-          print("✓ Python import ok (CI)", file=sys.stderr)
+          import pku3b_py, sys, platform
+          print("Wheel OK ->", pku3b_py, "on", platform.python_version())
           PY
