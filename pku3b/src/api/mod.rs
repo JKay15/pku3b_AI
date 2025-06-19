@@ -302,26 +302,6 @@ impl Course {
     pub fn meta(&self) -> &CourseMeta {
         &self.meta
     }
-
-    // pub fn content_stream(&self) -> CourseContentStream {
-    //     CourseContentStream::new(
-    //         self.client.clone(),
-    //         self.meta.clone(),
-    //         self.entries()
-    //             .iter()
-    //             .filter_map(|(_, uri)| {
-    //                 let url = low_level::convert_uri(uri).ok()?.into_url().ok()?;
-    //                 if !low_level::LIST_CONTENT.ends_with(url.path()) {
-    //                     return None;
-    //                 }
-
-    //                 let (_, content_id) = url.query_pairs().find(|(k, _)| k == "content_id")?;
-
-    //                 Some(content_id.to_string())
-    //             })
-    //             .collect(),
-    //     )
-    // }
     pub fn content_stream(&self) -> CourseContentStream {
         let mut initial_probes = Vec::new();
 
@@ -530,30 +510,7 @@ impl Course {
             .collect();
         Ok(out)
     }
-    // pub async fn list_assignments_with_hierarchy(
-    //     &self,
-    // ) -> anyhow::Result<(
-    //     Vec<CourseAssignmentHandle>,
-    //     Vec<usize>,             // depths
-    //     Vec<Option<String>>,    // parent_ids
-    // )> {
-    //     let mut stream = self.content_stream();
-    //     let mut handles = Vec::new();
-    //     let mut depths = Vec::new();
-    //     let mut parent_ids = Vec::new();
 
-    //     while let Some(batch) = stream.next_batch().await {
-    //         for data in batch {
-    //             if let Some(ah) = self.build_content(data.clone()).into_assignment_opt() {
-    //                 handles.push(ah);
-    //                 depths.push(data.depth);
-    //                 parent_ids.push(data.parent_id);
-    //             }
-    //         }
-    //     }
-
-    //     Ok((handles, depths, parent_ids))
-    // }
     /// 带层级信息的作业列表
     pub async fn list_assignments_with_hierarchy(
         &self,
@@ -607,11 +564,6 @@ impl Course {
     }
 }
 
-/// 队列元素：要探测的 content_id 及其层级路径
-struct Probe {
-    id: String,
-    path: Vec<String>,
-}
 /// 内容探测结构体，包含层级信息
 #[derive(Debug)]
 struct ContentProbe {
@@ -627,46 +579,12 @@ pub struct CourseContentStream {
     client: Client,
     course: Arc<CourseMeta>,
     visited_ids: HashSet<String>,
-    // // probe_ids: Vec<String>,
-    probe_queue: VecDeque<ContentProbe>, // 修改为 ContentProbe 队列
-    // // 保留关系映射
+    probe_queue: VecDeque<ContentProbe>, 
     parent_map: HashMap<String, Option<String>>,
-    depth_map: HashMap<String, usize>, // ID -> 深度
+    depth_map: HashMap<String, usize>,
 }
 
 impl CourseContentStream {
-    // fn new(client: Client, course: Arc<CourseMeta>, probe_ids: Vec<String>) -> Self {
-    //     // implicitly deduplicate probe_ids
-    //     let visited_ids = HashSet::from_iter(probe_ids);
-    //     let probe_ids = visited_ids.iter().cloned().collect();
-    //     Self {
-    //         batch_size: 8,
-    //         client,
-    //         course,
-    //         visited_ids,
-    //         probe_ids,
-    //     }
-    // }
-    // 保留原有new函数签名
-    // fn new(client: Client, course: Arc<CourseMeta>, probe_ids: Vec<String>) -> Self {
-    //     let visited_ids = HashSet::from_iter(probe_ids.iter().cloned());
-    //     // 转换初始 probe_ids 为新类型
-    //     let probe_ids_deque = probe_ids.into_iter()
-    //         .map(|id| (None, 0, id))  // 初始深度为0，无父节点
-    //         .collect::<VecDeque<_>>();
-
-    //     Self {
-    //         batch_size: 8,
-    //         client,
-    //         course,
-    //         visited_ids,
-    //         probe_ids: probe_ids_deque,
-
-    //         // 初始化层级信息
-    //         parent_map: HashMap::new(),
-    //         depth_map: HashMap::new(),
-    //     }
-    // }
     fn new(client: Client, course: Arc<CourseMeta>, initial_probes: Vec<ContentProbe>) -> Self {
         let visited_ids = initial_probes
             .iter()
@@ -692,102 +610,6 @@ impl CourseContentStream {
             depth_map,
         }
     }
-
-    // async fn try_next_batch(&mut self, ids: &[String]) -> anyhow::Result<Vec<CourseContentData>> {
-    //     let futs = ids
-    //         .iter()
-    //         .map(|id| self.client.bb_course_content_page(&self.course.id, id));
-
-    //     let doms = futures_util::future::join_all(futs).await;
-
-    //     let mut all_contents = Vec::new();
-    //     for dom in doms {
-    //         let dom = dom?;
-    //         let selector = Selector::parse("#content_listContainer > li").unwrap();
-    //         let contents = dom
-    //             .select(&selector)
-    //             .filter_map(|li| {
-    //                 CourseContentData::from_element(li)
-    //                     .inspect_err(|e| log::warn!("CourseContentData::from_element error: {e}"))
-    //                     .ok()
-    //             })
-    //             // filter out visited ids
-    //             .filter(|data| self.visited_ids.insert(data.id.to_owned()))
-    //             // add the rest new ids to probe_ids
-    //             .inspect(|data| {
-    //                 if data.has_link {
-    //                     self.probe_ids.push(data.id.to_owned())
-    //                 }
-    //             });
-
-    //         all_contents.extend(contents);
-    //     }
-
-    //     Ok(all_contents)
-    // }
-    // async fn try_next_batch(&mut self) -> anyhow::Result<Vec<CourseContentData>> {
-    //     let mut batch = Vec::with_capacity(self.batch_size);
-
-    //     while !self.probe_ids.is_empty() && batch.len() < self.batch_size {
-    //         let (parent_id, depth, id) = self.probe_ids.pop_front().unwrap();
-
-    //         // 深度检查（防止无限递归）
-    //         if depth >= MAX_DEPTH {
-    //             log::warn!("达到最大深度限制: {} (当前深度 {})", id, depth);
-    //             continue;
-    //         }
-
-    //         // 记录父关系
-    //         self.parent_map.insert(id.clone(), parent_id.clone());
-    //         self.depth_map.insert(id.clone(), depth);
-
-    //         // 获取内容页面
-    //         let dom = match self.client.bb_course_content_page(&self.course.id, &id).await {
-    //             Ok(dom) => dom,
-    //             Err(e) => {
-    //                 log::warn!("请求失败: {}，将重试。错误: {}", id, e);
-    //                 self.probe_ids.push_back((parent_id.clone(), depth, id.clone()));
-    //                 continue;
-    //             }
-    //         };
-
-    //         let selector = Selector::parse("#content_listContainer > li").unwrap();
-
-    //         // 直接循环处理列表项（不再使用并发）
-    //         for li in dom.select(&selector) {
-    //             match CourseContentData::from_element(li, Some(&id), depth + 1) {
-    //                 Ok(mut data) => {
-    //                     // 设置父ID和深度
-    //                     data.parent_id = parent_id.clone();
-    //                     data.depth = depth + 1;
-
-    //                     // 检查是否已访问
-    //                     if self.visited_ids.insert(data.id.clone()) {
-    //                         // 添加到当前批次
-    //                         batch.push(data.clone());
-
-    //                         // 记录关系映射
-    //                         self.parent_map.insert(data.id.clone(), Some(id.clone()));
-
-    //                         // 如果有链接，添加到待探测队列
-    //                         if data.has_link {
-    //                             self.probe_ids.push_back((
-    //                                 Some(data.id.clone()),
-    //                                 depth + 1,
-    //                                 data.id.clone()
-    //                             ));
-    //                         }
-    //                     } else {
-    //                         log::debug!("跳过重复内容: {}", data.id);
-    //                     }
-    //                 }
-    //                 Err(e) => log::warn!("解析元素错误: {}", e),
-    //             }
-    //         }
-    //     }
-
-    //     Ok(batch)
-    // }
     async fn try_next_batch(&mut self) -> anyhow::Result<Vec<CourseContentData>> {
         if self.probe_queue.is_empty() {
             return Ok(Vec::new());
@@ -888,25 +710,6 @@ impl CourseContentStream {
             .map(|(child, _)| child.as_str())
             .collect()
     }
-
-    // pub async fn next_batch(&mut self) -> Option<Vec<CourseContentData>> {
-    //     let ids = self
-    //         .probe_ids
-    //         .split_off(self.probe_ids.len().saturating_sub(self.batch_size));
-    //     if ids.is_empty() {
-    //         return None;
-    //     }
-    //     match self.try_next_batch(&ids).await {
-    //         Ok(r) => Some(r),
-    //         Err(e) => {
-    //             log::warn!("try_next_batch error {ids:?}: {e}");
-    //             return Box::pin(self.next_batch()).await;
-    //         }
-    //     }
-    // }
-    // pub fn num_finished(&self) -> usize {
-    //     self.visited_ids.len() - self.probe_ids.len()
-    // }
     pub fn num_finished(&self) -> usize {
         self.visited_ids.len() - self.probe_queue.len()
     }
@@ -960,195 +763,11 @@ pub struct CourseContentData {
     pub is_folder: bool,              // 是否是文件夹
 }
 
-fn collect_text(element: scraper::ElementRef) -> String {
-    let mut text_content = String::new();
-    for node_ref in element.children() {
-        match node_ref.value() {
-            scraper::node::Node::Text(text) => {
-                if !text.trim().is_empty() {
-                    text_content.push_str(text);
-                }
-            }
-            scraper::node::Node::Element(el) => {
-                if el.name() != "script" {
-                    if let Some(child_element) = scraper::ElementRef::wrap(node_ref) {
-                        text_content.push_str(&collect_text(child_element));
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-    text_content
-}
 
 impl CourseContentData {
-    // fn from_element(el: scraper::ElementRef<'_>) -> anyhow::Result<Self> {
-    //     anyhow::ensure!(el.value().name() == "li", "not a li element");
-
-    //     // ── ① 3 个子节点：图标 / 标题 div / 详情 div ─────────────
-    //     let (img, title_div, detail_div) =
-    //         el.child_elements().take(3).collect_tuple().unwrap();
-
-    //     // ── ② 内容类型判定 ───────────────────────────────────────
-    //     let kind = match img.attr("alt") {
-    //         Some("作业")               => CourseContentKind::Assignment,
-    //         Some("项目") | Some("文件") => CourseContentKind::Document,
-    //         alt                       => {
-    //             log::warn!("unknown content kind: {alt:?}");
-    //             CourseContentKind::Unknown
-    //         }
-    //     };
-
-    //     // ── ③ 基本字段 ─────────────────────────────────────────
-    //     let id   = title_div.attr("id").context("content_id not found")?.to_owned();
-    //     let title= title_div.text().collect::<String>().trim().to_owned();
-    //     let has_link = title_div.select(&Selector::parse("a").unwrap()).next().is_some();
-
-    //     // ── ④ 描述正文（纯文本）─────────────────────────────────
-    //     let descriptions = detail_div
-    //         .select(&Selector::parse("div.vtbegenerated > *").unwrap())
-    //         .map(|p| collect_text(p).trim().to_owned())
-    //         .collect::<Vec<_>>();
-
-    //     // ── ⑤ (A) 原有 <a> 附件 ────────────────────────────────
-    //     let mut attachments = detail_div
-    //         .select(&Selector::parse("ul.attachments > li > a").unwrap())
-    //         .map(|a| {
-    //             let text = a.text().collect::<String>().trim_start_matches('\u{a0}').to_owned();
-    //             let href = a.value().attr("href").unwrap().to_owned();
-    //             Ok((text, href))
-    //         })
-    //         .collect::<anyhow::Result<Vec<_>>>()?;
-
-    //     // ── ⑥ (B) 额外把 <img src=...> 也当作附件 ──────────────
-    //     /*-----------  (B) 嵌入 <img> 修正版 ----------*/
-    //     for (idx, img) in detail_div.select(&Selector::parse("img").unwrap()).enumerate() {
-    //         if let Some(src) = img.value().attr("src") {
-    //             // 1. 路径过滤：仍然要求 /bbcswebdav/
-    //             if !src.starts_with("/bbcswebdav/") {
-    //                 continue;
-    //             }
-
-    //             /* ---------- 2. 扩展名黑名单 ---------- */
-    //             // 取最后一个 '.' 后缀（若有）
-    //             let ext = src.rsplit_once('.').map(|(_, e)| e.to_ascii_lowercase());
-    //             // gif / svg / ico 这些 99% 是装饰图标
-    //             if matches!(ext.as_deref(), Some("gif" | "svg" | "ico")) {
-    //                 continue;
-    //             }
-
-    //             /* ---------- 3. 生成文件名 ---------- */
-    //             let fname = Url::parse(&format!("https://dummy{src}"))
-    //                 .ok()
-    //                 .and_then(|u| u.path_segments().and_then(|seg| seg.last()).map(|s| s.to_string()))
-    //                 .filter(|s| !s.is_empty())
-    //                 // 无扩展名时补 `.bin`
-    //                 .map(|s| if s.contains('.') { s } else { format!("{s}.bin") })
-    //                 .unwrap_or_else(|| format!("embed_img_{idx}.bin"));
-
-    //             attachments.push((fname, src.to_string()));
-    //         }
-    //     }
-
-    //     // ── ⑦ 结果 ─────────────────────────────────────────────
-    //     Ok(CourseContentData {
-    //         id,
-    //         title,
-    //         kind,
-    //         has_link,
-    //         descriptions,
-    //         attachments,
-    //     })
-    // }
     pub fn is_folder(&self) -> bool {
         self.is_folder
     }
-    // fn from_element(
-    //     el: scraper::ElementRef<'_>,
-    //     parent_id: Option<&str>, // 新增：父节点ID
-    //     depth: usize            // 新增：层级深度
-    // ) -> anyhow::Result<Self> {
-    //     // ...现有解析逻辑保持不变...
-    //     anyhow::ensure!(el.value().name() == "li", "not a li element");
-
-    //     // ── ① 3 个子节点：图标 / 标题 div / 详情 div ─────────────
-    //     let (img, title_div, detail_div) =
-    //         el.child_elements().take(3).collect_tuple().unwrap();
-
-    //     // ── ② 内容类型判定 ───────────────────────────────────────
-    //     let kind = match img.attr("alt") {
-    //         Some("作业")               => CourseContentKind::Assignment,
-    //         Some("项目") | Some("文件") => CourseContentKind::Document,
-    //         alt                       => {
-    //             log::warn!("unknown content kind: {alt:?}");
-    //             CourseContentKind::Unknown
-    //         }
-    //     };
-
-    //     // ── ③ 基本字段 ─────────────────────────────────────────
-    //     let id   = title_div.attr("id").context("content_id not found")?.to_owned();
-    //     let title= title_div.text().collect::<String>().trim().to_owned();
-    //     let has_link = title_div.select(&Selector::parse("a").unwrap()).next().is_some();
-
-    //     // ── ④ 描述正文（纯文本）─────────────────────────────────
-    //     let descriptions = detail_div
-    //         .select(&Selector::parse("div.vtbegenerated > *").unwrap())
-    //         .map(|p| collect_text(p).trim().to_owned())
-    //         .collect::<Vec<_>>();
-
-    //     // ── ⑤ (A) 原有 <a> 附件 ────────────────────────────────
-    //     let mut attachments = detail_div
-    //         .select(&Selector::parse("ul.attachments > li > a").unwrap())
-    //         .map(|a| {
-    //             let text = a.text().collect::<String>().trim_start_matches('\u{a0}').to_owned();
-    //             let href = a.value().attr("href").unwrap().to_owned();
-    //             Ok((text, href))
-    //         })
-    //         .collect::<anyhow::Result<Vec<_>>>()?;
-
-    //     // ── ⑥ (B) 额外把 <img src=...> 也当作附件 ──────────────
-    //     /*-----------  (B) 嵌入 <img> 修正版 ----------*/
-    //     for (idx, img) in detail_div.select(&Selector::parse("img").unwrap()).enumerate() {
-    //         if let Some(src) = img.value().attr("src") {
-    //             // 1. 路径过滤：仍然要求 /bbcswebdav/
-    //             if !src.starts_with("/bbcswebdav/") {
-    //                 continue;
-    //             }
-
-    //             /* ---------- 2. 扩展名黑名单 ---------- */
-    //             // 取最后一个 '.' 后缀（若有）
-    //             let ext = src.rsplit_once('.').map(|(_, e)| e.to_ascii_lowercase());
-    //             // gif / svg / ico 这些 99% 是装饰图标
-    //             if matches!(ext.as_deref(), Some("gif" | "svg" | "ico")) {
-    //                 continue;
-    //             }
-
-    //             /* ---------- 3. 生成文件名 ---------- */
-    //             let fname = Url::parse(&format!("https://dummy{src}"))
-    //                 .ok()
-    //                 .and_then(|u| u.path_segments().and_then(|seg| seg.last()).map(|s| s.to_string()))
-    //                 .filter(|s| !s.is_empty())
-    //                 // 无扩展名时补 `.bin`
-    //                 .map(|s| if s.contains('.') { s } else { format!("{s}.bin") })
-    //                 .unwrap_or_else(|| format!("embed_img_{idx}.bin"));
-
-    //             attachments.push((fname, src.to_string()));
-    //         }
-    //     }
-
-    //     Ok(CourseContentData {
-    //         id,
-    //         title,
-    //         kind,
-    //         has_link,
-    //         descriptions,
-    //         attachments,
-    //         // 新添加的层级信息
-    //         parent_id: parent_id.map(String::from),
-    //         depth,
-    //     })
-    // }
     pub fn from_element(
         el: ElementRef,
         parent_id: Option<&str>,
@@ -1297,13 +916,6 @@ pub struct CourseAssignmentHandle {
 }
 
 impl CourseAssignmentHandle {
-    // pub fn id(&self) -> String {
-    //     let mut hasher = std::hash::DefaultHasher::new();
-    //     self.course.id.hash(&mut hasher);
-    //     self.content.id.hash(&mut hasher);
-    //     let x = hasher.finish();
-    //     format!("{x:x}")
-    // }
     /// 获取深度（在内容树中的层级）
     pub fn depth(&self) -> usize {
         self.content.depth
@@ -1400,8 +1012,6 @@ impl CourseAssignmentHandle {
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 struct CourseAssignmentData {
-    // descriptions: Vec<String>,
-    // attachments: Vec<(String, String)>,
     deadline: Option<String>,
     attempt: Option<String>,
 }
@@ -1617,39 +1227,6 @@ impl CourseAssignment {
 
         Ok(())
     }
-    // pub async fn download_attachment(
-    //     &self,
-    //     uri: &str,
-    //     dest: &std::path::Path,
-    // ) -> anyhow::Result<()> {
-    //     log::debug!(
-    //         "downloading attachment from https://course.pku.edu.cn{}",
-    //         uri
-    //     );
-    //     let res = self.client.get_by_uri(uri).await?;
-    //     anyhow::ensure!(
-    //         res.status().as_u16() == 302,
-    //         "status not 302: {}",
-    //         res.status()
-    //     );
-
-    //     let loc = res
-    //         .headers()
-    //         .get("location")
-    //         .context("location header not found")?
-    //         .to_str()
-    //         .context("location header not str")?
-    //         .to_owned();
-
-    //     log::debug!("redicted to https://course.pku.edu.cn{}", loc);
-    //     let res = self.client.get_by_uri(&loc).await?;
-    //     anyhow::ensure!(res.status().is_success(), "status not success");
-
-    //     let rbody = res.bytes().await?;
-    //     let r = compio::fs::write(dest, rbody).await;
-    //     compio::buf::buf_try!(@try r);
-    //     Ok(())
-    // }
     /// 旧随机哈希（仅供 CLI 兼容）
     pub fn id_legacy(&self) -> String {
         use std::hash::{Hash, Hasher};
@@ -1854,15 +1431,6 @@ pub struct CourseVideoHandle {
 }
 
 impl CourseVideoHandle {
-    /// Course video identifier computed from hash.
-    // pub fn id(&self) -> String {
-    //     let mut hasher = std::hash::DefaultHasher::new();
-    //     self.course.id.hash(&mut hasher);
-    //     self.meta.title.hash(&mut hasher);
-    //     self.meta.time.hash(&mut hasher);
-    //     let x = hasher.finish();
-    //     format!("{x:x}")
-    // }
     pub fn id(&self) -> String {
         // meta.url 形如 https://...player.html?course_id=_80167_1&sub_id=abc123&app_id=4
         let sub_id = Url::parse(&self.meta.url)
