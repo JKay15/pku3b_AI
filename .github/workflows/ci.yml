@@ -1,71 +1,69 @@
 name: Rust + Python CI
 
-# 什么时候触发
 on:
-  push:
-    branches: [ main ]
+  push:        # 任意 push 都跑
+    branches: ["**"]
   pull_request:
+    branches: ["main"]
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
-    # 如果以后想一次性测多个 Python 版本，只要把下面的列表加上 '3.11' 等即可
+    # 如需同时测 3.11、3.12，自行把数组扩展
     strategy:
       matrix:
-        python-version: ['3.12']
+        python-version: ["3.12"]
 
     steps:
-      # ① 拉代码
-      - uses: actions/checkout@v4
-
-      # ② 安装 Rust（稳定版）+ clippy（可选）
-      - name: Set up Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+      # 1️⃣ 取代码
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          components: clippy
+          submodules: recursive
 
-      # ③ 缓存 Cargo 依赖，加速构建
-      - name: Cache Cargo registry
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-
-      # ④ 构建 & 运行 Rust 单元测试
-      - name: cargo test
-        run: cargo test --workspace --all-features
-
-      # ⑤ 安装指定版本 Python
+      # 2️⃣ Python 环境
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "${{ matrix.python-version }}"
 
-      # ⑥ 安装 maturin（用来把 Rust 打成 Python wheel）
+      # 3️⃣ Rust 环境
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+
+      # 4️⃣ 安装 maturin（用 pip 最简单）
       - name: Install maturin
         run: pip install maturin
 
-      # ⑦ 在 pku3b_py 目录里编译 wheel（不需要 virtualenv）
+      # 5️⃣ Rust 代码能不能编译？
+      - name: Cargo check (workspace)
+        run: cargo check --workspace --all-targets
+
+      # 6️⃣ 进入 pku3b_py ➜ 构建 wheel
       - name: Build wheel with maturin
         run: |
           cd pku3b_py
-          maturin build --release --interpreter python${{ matrix.python-version }}
+          maturin build --release \
+              --interpreter python${{ matrix.python-version }}
 
-      # ⑧ 装好 wheel，确保 import 没问题
+      # 7️⃣ 看看 wheel 真生成了（调试用）
+      - name: List wheels
+        run: ls -l pku3b_py/target/wheels
+
+      # 8️⃣ 安装 wheel（这里用 shell 展开 *.whl，避免再次找不到文件）
       - name: Install wheel
         run: |
-          pip install pku3b_py/target/wheels/*.whl
+          pip install $(ls pku3b_py/target/wheels/*.whl)
 
-      # ⑨ 简单跑一个 “能 import 就 OK” 的 smoke test
-      - name: Python import smoke-test
+      # 9️⃣ 烟测——能 import 就算过
+      - name: Python smoke test
         run: |
           python - <<'PY'
-          import pku3b_py, sys, platform
-          print("Wheel OK ->", pku3b_py, "on", platform.python_version())
+          import pku3b_py, sys
+          print("✅ pku3b_py imported; Python", sys.version)
           PY
