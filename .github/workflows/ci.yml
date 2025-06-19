@@ -1,0 +1,35 @@
+name: Rust + Python CI
+
+on: [push, pull_request]   # 每次 push / PR 都跑
+
+jobs:
+  build:
+    runs-on: ubuntu-latest  # GitHub 提供的免费 Linux 虚机
+    steps:
+      # 1. 拉代码
+      - uses: actions/checkout@v4
+
+      # 2. 安装 Rust stable
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+
+      # 3. 安装 Python 3.12 + maturin
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install maturin
+
+      # 4. 跑 Rust 单元测试
+      - run: cargo test --workspace --all-features --locked
+
+      # 5. 编译 Py3 模块并简单 import 一下
+      - run: |
+          cd pku3b_py
+          maturin develop --quiet
+          python - <<'PY'
+          import pku3b_py, sys
+          print("✓ Python import ok (CI)", file=sys.stderr)
+          PY
