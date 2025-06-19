@@ -14,53 +14,48 @@ jobs:
         python-version: ["3.12"]
 
     steps:
-      - uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "${{ matrix.python-version }}"
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
 
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          override: true
+    - name: Set up Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        profile: minimal
+        override: true
 
-      - name: Install maturin
-        run: pip install maturin
+    - name: Install maturin
+      run: pip install maturin
 
-      # ─────────────── Rust 编译检查 ───────────────
-      - name: Cargo check (workspace)
-        run: cargo check --workspace --all-targets
+    # ───────── Rust 语法/编译检查 ─────────
+    - name: cargo check
+      run: cargo check --workspace --all-targets
 
-      # ─────────────── 构建 Python wheel ───────────────
-      - name: Build wheel with maturin
-        run: |
-          set -e
-          maturin build --release \
-            --manifest-path pku3b_py/Cargo.toml \
-            --interpreter python${{ matrix.python-version }}
-          echo "maturin finished ✅"
+    # ───────── Build wheel ─────────
+    - name: Build wheel with maturin
+      run: |
+        set -e
+        # 把 wheel 统一放到 ./wheelhouse
+        maturin build --release \
+          --manifest-path pku3b_py/Cargo.toml \
+          --interpreter python${{ matrix.python-version }} \
+          --out wheelhouse
+        ls -l wheelhouse
 
-      # ─────────────── 列出 wheel (调试) ───────────────
-      - name: List produced wheels
-        run: |
-          ls -R pku3b_py/target || true
-          ls -l pku3b_py/target/wheels || true
+    # ───────── Install wheel ─────────
+    - name: Install wheel
+      run: pip install wheelhouse/*.whl
 
-      # ─────────────── 安装 wheel ───────────────
-      - name: Install wheel
-        run: |
-          pip install $(ls pku3b_py/target/wheels/*.whl)
-
-      # ─────────────── 烟雾测试 ───────────────
-      - name: Import test
-        run: |
-          python - <<'PY'
-          import pku3b_py, sys, pathlib
-          print("✅  imported pku3b_py:", pku3b_py.__name__)
-          print("   Python version   :", sys.version)
-          print("   Wheel location   :", pathlib.Path(pku3b_py.__file__).parent)
-          PY
+    # ───────── 烟雾测试 ─────────
+    - name: Import test
+      run: |
+        python - <<'PY'
+        import pku3b_py, pathlib, sys
+        print("✅  import ok:", pku3b_py.__name__)
+        print("wheel path  :", pathlib.Path(pku3b_py.__file__).parent)
+        print("python      :", sys.version)
+        PY
