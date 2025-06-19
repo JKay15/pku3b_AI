@@ -1,28 +1,28 @@
 mod low_level;
 
-use url::Url;
-use anyhow::Context;
-use chrono::TimeZone;
-use cyper::IntoUrl;
-use itertools::Itertools;
-use futures_util::future::join_all;
-use scraper::Selector;
-use scraper::ElementRef;
-use std::{
-    collections::{HashMap, HashSet,VecDeque},
-    hash::{Hash, Hasher},
-    str::FromStr,
-    sync::Arc,
-};
 use crate::{
     multipart, qs,
     utils::{with_cache, with_cache_bytes},
 };
+use anyhow::Context;
+use chrono::TimeZone;
+use cyper::IntoUrl;
+use futures_util::future::join_all;
+use itertools::Itertools;
+use scraper::ElementRef;
+use scraper::Selector;
+use std::{
+    collections::{HashMap, HashSet, VecDeque},
+    hash::{Hash, Hasher},
+    str::FromStr,
+    sync::Arc,
+};
+use url::Url;
 
 const ONE_HOUR: std::time::Duration = std::time::Duration::from_secs(3600);
 const ONE_DAY: std::time::Duration = std::time::Duration::from_secs(3600 * 24);
 const AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36";
-const MAX_DEPTH: usize = 20;  // 最大深度限制
+const MAX_DEPTH: usize = 20; // 最大深度限制
 struct ClientInner {
     http_client: low_level::LowLevelClient,
     cache_ttl: Option<std::time::Duration>,
@@ -140,7 +140,6 @@ impl Blackboard {
         let re = regex::Regex::new(r"key=([\d_]+),").unwrap();
         let ul_sel = Selector::parse("ul.courseListing").unwrap();
         let sel = Selector::parse("li a").unwrap();
-
 
         let f = |a: scraper::ElementRef<'_>| {
             let href = a.value().attr("href").unwrap();
@@ -282,9 +281,7 @@ impl CourseHandle {
         })
     }
     /// 直接把内部 Course 的 list_assignments 暴露出去，供 CLI / PyO3 使用
-    pub async fn list_assignments(
-        &self,
-    ) -> anyhow::Result<Vec<CourseAssignmentHandle>> {
+    pub async fn list_assignments(&self) -> anyhow::Result<Vec<CourseAssignmentHandle>> {
         let course = self.get().await?;
         course.list_assignments().await
     }
@@ -327,7 +324,7 @@ impl Course {
     // }
     pub fn content_stream(&self) -> CourseContentStream {
         let mut initial_probes = Vec::new();
-        
+
         // 为每个栏目创建初始探针
         for (section_name, uri) in &self.entries {
             // 修正：使用 Url::parse 代替 into_url
@@ -350,12 +347,8 @@ impl Course {
                 }
             }
         }
-        
-        CourseContentStream::new(
-            self.client.clone(),
-            self.meta.clone(),
-            initial_probes,
-        )
+
+        CourseContentStream::new(self.client.clone(), self.meta.clone(), initial_probes)
     }
 
     pub fn build_content(&self, data: CourseContentData) -> CourseContent {
@@ -450,11 +443,9 @@ impl Course {
         Ok(videos)
     }
     /// 列出本课程全部作业句柄（AssignmentHandle）
-    pub async fn list_assignments(
-        &self,
-    ) -> anyhow::Result<Vec<CourseAssignmentHandle>> {
+    pub async fn list_assignments(&self) -> anyhow::Result<Vec<CourseAssignmentHandle>> {
         let mut stream = self.content_stream();
-        let mut list   = Vec::new();
+        let mut list = Vec::new();
 
         while let Some(batch) = stream.next_batch().await {
             for data in batch {
@@ -470,21 +461,20 @@ impl Course {
         self.get_video_list().await
     }
     /// 列出本课程所有 Document（课件 / 通知等）内容句柄
-    pub async fn list_documents(&self)
-        -> anyhow::Result<Vec<CourseDocumentHandle>>
-    {
+    pub async fn list_documents(&self) -> anyhow::Result<Vec<CourseDocumentHandle>> {
         let mut stream = self.content_stream();
-        let mut docs   = Vec::new();
+        let mut docs = Vec::new();
 
         while let Some(batch) = stream.next_batch().await {
             docs.extend(
-                batch.into_iter()
+                batch
+                    .into_iter()
                     .filter(|d| matches!(d.kind, CourseContentKind::Document))
                     .map(|data| CourseDocumentHandle {
-                        client:  self.client.clone(),
-                        course:  self.meta.clone(),
-                        content: data.into(),          // Arc<CourseContentData>
-                    })
+                        client: self.client.clone(),
+                        course: self.meta.clone(),
+                        content: data.into(), // Arc<CourseContentData>
+                    }),
             );
         }
         Ok(docs)
@@ -498,23 +488,43 @@ impl Course {
         /* ② launch_link -> 302 */
         let real = self.query_launch_link(url).await?;
         /* ③ 拉页面，解析 li.announcement */
-        let dom  = self.client.get_by_uri(&real).await?.text().await?;
-        let doc  = scraper::Html::parse_document(&dom);
-        let sel  = scraper::Selector::parse("li.announcement").unwrap();
+        let dom = self.client.get_by_uri(&real).await?.text().await?;
+        let doc = scraper::Html::parse_document(&dom);
+        let sel = scraper::Selector::parse("li.announcement").unwrap();
 
-        let out = doc.select(&sel)
-            .filter_map(|li|{
-                let title = li.select(&scraper::Selector::parse("a").unwrap())
-                              .next()?.text().collect::<String>();
-                let href  = li.select(&scraper::Selector::parse("a").unwrap())
-                              .next()?.value().attr("href")?.to_string();
-                let time  = li.select(&scraper::Selector::parse("span.date").unwrap())
-                              .next()?.text().collect::<String>();
-                let id    = href.split_once("annId=").map(|(_,x)|x).unwrap_or(&href).to_string();
-                Some(CourseAnnouncementHandle{
-                    client : self.client.clone(),
-                    course : self.meta.clone(),
-                    meta   : Arc::new(CourseAnnouncementMeta{ id,title,time,href }),
+        let out = doc
+            .select(&sel)
+            .filter_map(|li| {
+                let title = li
+                    .select(&scraper::Selector::parse("a").unwrap())
+                    .next()?
+                    .text()
+                    .collect::<String>();
+                let href = li
+                    .select(&scraper::Selector::parse("a").unwrap())
+                    .next()?
+                    .value()
+                    .attr("href")?
+                    .to_string();
+                let time = li
+                    .select(&scraper::Selector::parse("span.date").unwrap())
+                    .next()?
+                    .text()
+                    .collect::<String>();
+                let id = href
+                    .split_once("annId=")
+                    .map(|(_, x)| x)
+                    .unwrap_or(&href)
+                    .to_string();
+                Some(CourseAnnouncementHandle {
+                    client: self.client.clone(),
+                    course: self.meta.clone(),
+                    meta: Arc::new(CourseAnnouncementMeta {
+                        id,
+                        title,
+                        time,
+                        href,
+                    }),
                 })
             })
             .collect();
@@ -541,14 +551,16 @@ impl Course {
     //             }
     //         }
     //     }
-        
+
     //     Ok((handles, depths, parent_ids))
     // }
     /// 带层级信息的作业列表
-    pub async fn list_assignments_with_hierarchy(&self) -> anyhow::Result<Vec<CourseAssignmentHandle>> {
+    pub async fn list_assignments_with_hierarchy(
+        &self,
+    ) -> anyhow::Result<Vec<CourseAssignmentHandle>> {
         let mut stream = self.content_stream();
         let mut results = Vec::new();
-        
+
         while let Some(batch) = stream.next_batch().await {
             for content in batch {
                 if let CourseContentKind::Assignment = content.kind {
@@ -560,7 +572,7 @@ impl Course {
                 }
             }
         }
-        
+
         Ok(results)
     }
 
@@ -569,8 +581,8 @@ impl Course {
         &self,
     ) -> anyhow::Result<(
         Vec<CourseDocumentHandle>,
-        Vec<usize>,             // depths
-        Vec<Option<String>>,    // parent_ids
+        Vec<usize>,          // depths
+        Vec<Option<String>>, // parent_ids
     )> {
         let mut stream = self.content_stream();
         let mut handles = Vec::new();
@@ -590,14 +602,14 @@ impl Course {
                 }
             }
         }
-        
+
         Ok((handles, depths, parent_ids))
     }
 }
 
 /// 队列元素：要探测的 content_id 及其层级路径
 struct Probe {
-    id:   String,
+    id: String,
     path: Vec<String>,
 }
 /// 内容探测结构体，包含层级信息
@@ -619,8 +631,7 @@ pub struct CourseContentStream {
     probe_queue: VecDeque<ContentProbe>, // 修改为 ContentProbe 队列
     // // 保留关系映射
     parent_map: HashMap<String, Option<String>>,
-    depth_map: HashMap<String, usize>,          // ID -> 深度
-   
+    depth_map: HashMap<String, usize>, // ID -> 深度
 }
 
 impl CourseContentStream {
@@ -643,33 +654,34 @@ impl CourseContentStream {
     //     let probe_ids_deque = probe_ids.into_iter()
     //         .map(|id| (None, 0, id))  // 初始深度为0，无父节点
     //         .collect::<VecDeque<_>>();
-        
+
     //     Self {
     //         batch_size: 8,
     //         client,
     //         course,
     //         visited_ids,
     //         probe_ids: probe_ids_deque,
-            
+
     //         // 初始化层级信息
     //         parent_map: HashMap::new(),
     //         depth_map: HashMap::new(),
     //     }
     // }
     fn new(client: Client, course: Arc<CourseMeta>, initial_probes: Vec<ContentProbe>) -> Self {
-        let visited_ids = initial_probes.iter()
+        let visited_ids = initial_probes
+            .iter()
             .map(|p| p.id.clone())
             .collect::<HashSet<_>>();
-            
+
         let probe_queue = VecDeque::from(initial_probes);
         let mut parent_map = HashMap::new();
         let mut depth_map = HashMap::new();
-        
+
         for probe in &probe_queue {
             parent_map.insert(probe.id.clone(), probe.parent_id.clone());
             depth_map.insert(probe.id.clone(), probe.depth);
         }
-        
+
         Self {
             batch_size: 8,
             client,
@@ -680,7 +692,7 @@ impl CourseContentStream {
             depth_map,
         }
     }
-    
+
     // async fn try_next_batch(&mut self, ids: &[String]) -> anyhow::Result<Vec<CourseContentData>> {
     //     let futs = ids
     //         .iter()
@@ -715,20 +727,20 @@ impl CourseContentStream {
     // }
     // async fn try_next_batch(&mut self) -> anyhow::Result<Vec<CourseContentData>> {
     //     let mut batch = Vec::with_capacity(self.batch_size);
-        
+
     //     while !self.probe_ids.is_empty() && batch.len() < self.batch_size {
     //         let (parent_id, depth, id) = self.probe_ids.pop_front().unwrap();
-            
+
     //         // 深度检查（防止无限递归）
     //         if depth >= MAX_DEPTH {
     //             log::warn!("达到最大深度限制: {} (当前深度 {})", id, depth);
     //             continue;
     //         }
-            
+
     //         // 记录父关系
     //         self.parent_map.insert(id.clone(), parent_id.clone());
     //         self.depth_map.insert(id.clone(), depth);
-            
+
     //         // 获取内容页面
     //         let dom = match self.client.bb_course_content_page(&self.course.id, &id).await {
     //             Ok(dom) => dom,
@@ -738,9 +750,9 @@ impl CourseContentStream {
     //                 continue;
     //             }
     //         };
-            
+
     //         let selector = Selector::parse("#content_listContainer > li").unwrap();
-            
+
     //         // 直接循环处理列表项（不再使用并发）
     //         for li in dom.select(&selector) {
     //             match CourseContentData::from_element(li, Some(&id), depth + 1) {
@@ -748,15 +760,15 @@ impl CourseContentStream {
     //                     // 设置父ID和深度
     //                     data.parent_id = parent_id.clone();
     //                     data.depth = depth + 1;
-                        
+
     //                     // 检查是否已访问
     //                     if self.visited_ids.insert(data.id.clone()) {
     //                         // 添加到当前批次
     //                         batch.push(data.clone());
-                            
+
     //                         // 记录关系映射
     //                         self.parent_map.insert(data.id.clone(), Some(id.clone()));
-                            
+
     //                         // 如果有链接，添加到待探测队列
     //                         if data.has_link {
     //                             self.probe_ids.push_back((
@@ -773,17 +785,17 @@ impl CourseContentStream {
     //             }
     //         }
     //     }
-        
+
     //     Ok(batch)
     // }
     async fn try_next_batch(&mut self) -> anyhow::Result<Vec<CourseContentData>> {
         if self.probe_queue.is_empty() {
             return Ok(Vec::new());
         }
-        
+
         let mut batch = Vec::with_capacity(self.batch_size);
         let mut to_process = Vec::with_capacity(self.batch_size);
-        
+
         // 准备要处理的探测点
         for _ in 0..self.batch_size {
             if let Some(probe) = self.probe_queue.pop_front() {
@@ -796,14 +808,14 @@ impl CourseContentStream {
                 break;
             }
         }
-        
+
         // 并发获取页面
-        let futs = to_process.iter().map(|p| {
-            self.client.bb_course_content_page(&self.course.id, &p.id)
-        });
-        
+        let futs = to_process
+            .iter()
+            .map(|p| self.client.bb_course_content_page(&self.course.id, &p.id));
+
         let doms = join_all(futs).await;
-        
+
         // 处理结果
         for (probe, dom_result) in to_process.into_iter().zip(doms.into_iter()) {
             match dom_result {
@@ -819,12 +831,13 @@ impl CourseContentStream {
                         ) {
                             Ok(data) => {
                                 // 更新层级映射
-                                self.parent_map.insert(data.id.clone(), Some(probe.id.clone()));
+                                self.parent_map
+                                    .insert(data.id.clone(), Some(probe.id.clone()));
                                 self.depth_map.insert(data.id.clone(), data.depth);
-                                
+
                                 // 添加到批次
                                 batch.push(data.clone());
-                                
+
                                 // 如果是文件夹且有链接，添加到探测队列
                                 if data.is_folder && data.has_link {
                                     let child_probe = ContentProbe {
@@ -834,7 +847,7 @@ impl CourseContentStream {
                                         id: data.id.clone(),
                                         section_name: probe.section_name.clone(), // 保持同一栏目
                                     };
-                                    
+
                                     self.probe_queue.push_back(child_probe);
                                 }
                             }
@@ -849,10 +862,10 @@ impl CourseContentStream {
                 }
             }
         }
-        
+
         Ok(batch)
     }
-    
+
     pub async fn next_batch(&mut self) -> Option<Vec<CourseContentData>> {
         match self.try_next_batch().await {
             Ok(batch) if !batch.is_empty() => Some(batch),
@@ -864,16 +877,18 @@ impl CourseContentStream {
         }
     }
     pub fn get_parent(&self, id: &str) -> Option<&str> {
-        self.parent_map.get(id)
+        self.parent_map
+            .get(id)
             .and_then(|opt| opt.as_ref().map(|s| s.as_str()))
     }
     pub fn get_children(&self, id: &str) -> Vec<&str> {
-        self.parent_map.iter()
+        self.parent_map
+            .iter()
             .filter(|(_, parent)| parent.as_ref().map_or(false, |p| p == id))
             .map(|(child, _)| child.as_str())
             .collect()
     }
-    
+
     // pub async fn next_batch(&mut self) -> Option<Vec<CourseContentData>> {
     //     let ids = self
     //         .probe_ids
@@ -929,7 +944,7 @@ enum CourseContentKind {
     Unknown,
 }
 
-#[derive(Debug,Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct CourseContentData {
     id: String,
     title: String,
@@ -942,7 +957,7 @@ pub struct CourseContentData {
     pub parent_title: Option<String>, // 新增：父节点标题
     depth: usize,
     pub section_name: Option<String>, // 新增：所属栏目名称（如"课程课件"）
-    pub is_folder: bool, // 是否是文件夹
+    pub is_folder: bool,              // 是否是文件夹
 }
 
 fn collect_text(element: scraper::ElementRef) -> String {
@@ -1121,7 +1136,7 @@ impl CourseContentData {
     //             attachments.push((fname, src.to_string()));
     //         }
     //     }
-        
+
     //     Ok(CourseContentData {
     //         id,
     //         title,
@@ -1140,7 +1155,8 @@ impl CourseContentData {
         parent_title: Option<&str>,
         depth: usize,
         section_name: Option<&str>,
-    ) -> anyhow::Result<Self> { // 修正：使用 anyhow::Result
+    ) -> anyhow::Result<Self> {
+        // 修正：使用 anyhow::Result
         anyhow::ensure!(el.value().name() == "li", "not a li element");
 
         // ── ① 3 个子节点：图标 / 标题 div / 详情 div ─────────────
@@ -1153,7 +1169,9 @@ impl CourseContentData {
         let alt = img.attr("alt");
         let (kind, is_folder) = match alt {
             Some("作业") => (CourseContentKind::Assignment, false),
-            Some("内容文件夹") | Some("文件夹") | Some("目录") => (CourseContentKind::Folder, true), // 使用 Folder 变体
+            Some("内容文件夹") | Some("文件夹") | Some("目录") => {
+                (CourseContentKind::Folder, true)
+            } // 使用 Folder 变体
             Some("项目") | Some("文件") => (CourseContentKind::Document, false),
             Some(alt) => {
                 log::warn!("unknown content kind: {alt:?}");
@@ -1163,9 +1181,15 @@ impl CourseContentData {
         };
 
         // ── ③ 基本字段 ─────────────────────────────────────────
-        let id = title_div.attr("id").context("content_id not found")?.to_owned();
+        let id = title_div
+            .attr("id")
+            .context("content_id not found")?
+            .to_owned();
         let title = title_div.text().collect::<String>().trim().to_owned();
-        let has_link = title_div.select(&Selector::parse("a").unwrap()).next().is_some();
+        let has_link = title_div
+            .select(&Selector::parse("a").unwrap())
+            .next()
+            .is_some();
 
         // ── ④ 描述正文（纯文本）─────────────────────────────────
         let descriptions = detail_div
@@ -1177,14 +1201,21 @@ impl CourseContentData {
         let mut attachments = detail_div
             .select(&Selector::parse("ul.attachments > li > a").unwrap())
             .map(|a| {
-                let text = a.text().collect::<String>().trim_start_matches('\u{a0}').to_owned();
+                let text = a
+                    .text()
+                    .collect::<String>()
+                    .trim_start_matches('\u{a0}')
+                    .to_owned();
                 let href = a.value().attr("href").unwrap().to_owned();
                 Ok((text, href))
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
 
         // ── ⑥ (B) 额外把 <img src=...> 也当作附件 ──────────────
-        for (idx, img) in detail_div.select(&Selector::parse("img").unwrap()).enumerate() {
+        for (idx, img) in detail_div
+            .select(&Selector::parse("img").unwrap())
+            .enumerate()
+        {
             if let Some(src) = img.value().attr("src") {
                 // 1. 路径过滤：仍然要求 /bbcswebdav/
                 if !src.starts_with("/bbcswebdav/") {
@@ -1200,15 +1231,25 @@ impl CourseContentData {
                 // 3. 生成文件名
                 let fname = Url::parse(&format!("https://dummy{src}"))
                     .ok()
-                    .and_then(|u| u.path_segments().and_then(|seg| seg.last()).map(|s| s.to_string()))
+                    .and_then(|u| {
+                        u.path_segments()
+                            .and_then(|seg| seg.last())
+                            .map(|s| s.to_string())
+                    })
                     .filter(|s| !s.is_empty())
-                    .map(|s| if s.contains('.') { s } else { format!("{s}.bin") })
+                    .map(|s| {
+                        if s.contains('.') {
+                            s
+                        } else {
+                            format!("{s}.bin")
+                        }
+                    })
                     .unwrap_or_else(|| format!("embed_img_{idx}.bin"));
 
                 attachments.push((fname, src.to_string()));
             }
         }
-        
+
         Ok(Self {
             id,
             title,
@@ -1224,11 +1265,11 @@ impl CourseContentData {
             is_folder,
         })
     }
-    
+
     /// 递归收集元素的文本内容
     fn collect_text(element: ElementRef) -> String {
         let mut buffer = String::new();
-        
+
         for node in element.children() {
             match node.value() {
                 scraper::node::Node::Text(text) => buffer.push_str(text),
@@ -1243,11 +1284,10 @@ impl CourseContentData {
                 _ => {}
             }
         }
-        
+
         buffer
     }
 }
-
 
 #[derive(Debug, Clone)]
 pub struct CourseAssignmentHandle {
@@ -1268,7 +1308,7 @@ impl CourseAssignmentHandle {
     pub fn depth(&self) -> usize {
         self.content.depth
     }
-    
+
     /// 获取父节点ID
     pub fn parent_id(&self) -> Option<String> {
         self.content.parent_id.clone()
@@ -1390,7 +1430,6 @@ impl CourseAssignment {
     pub fn last_attempt(&self) -> Option<&str> {
         self.data.attempt.as_deref()
     }
-
 
     pub async fn get_submit_formfields(&self) -> anyhow::Result<HashMap<String, String>> {
         let dom = self
@@ -1565,7 +1604,11 @@ impl CourseAssignment {
         }
 
         /* ---------- 200 OK：拿到数据 ---------- */
-        anyhow::ensure!(res.status().is_success(), "status not success: {}", res.status());
+        anyhow::ensure!(
+            res.status().is_success(),
+            "status not success: {}",
+            res.status()
+        );
         let body = res.bytes().await?;
 
         // compio::fs::write 返回 BufResult，仍需用宏展开成 Result
@@ -1631,7 +1674,7 @@ impl CourseDocumentHandle {
     pub fn depth(&self) -> usize {
         self.content.depth
     }
-    
+
     /// 获取父节点ID
     pub fn parent_id(&self) -> Option<String> {
         self.content.parent_id.clone()
@@ -1666,10 +1709,18 @@ pub struct CourseDocument {
 
 impl CourseDocument {
     /* —— 基本信息 —— */
-    pub fn id(&self) -> String            { self.course.id().to_owned() }
-    pub fn title(&self) -> &str           { &self.content.title         }
-    pub fn descriptions(&self) -> &[String]               { &self.content.descriptions }
-    pub fn attachments(&self)  -> &[(String,String)]      { &self.content.attachments  }
+    pub fn id(&self) -> String {
+        self.course.id().to_owned()
+    }
+    pub fn title(&self) -> &str {
+        &self.content.title
+    }
+    pub fn descriptions(&self) -> &[String] {
+        &self.content.descriptions
+    }
+    pub fn attachments(&self) -> &[(String, String)] {
+        &self.content.attachments
+    }
 
     pub async fn download_attachment(
         &self,
@@ -1723,43 +1774,54 @@ impl CourseDocument {
 
 #[derive(Debug, Clone)]
 pub struct CourseAnnouncementMeta {
-    id:   String,   // 可用 href 中 annId 或时间戳做稳定 id
+    id: String, // 可用 href 中 annId 或时间戳做稳定 id
     time: String,
-    title:String,
+    title: String,
     href: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct CourseAnnouncementHandle {
-    client : Client,
-    course : Arc<CourseMeta>,
-    meta   : Arc<CourseAnnouncementMeta>,
+    client: Client,
+    course: Arc<CourseMeta>,
+    meta: Arc<CourseAnnouncementMeta>,
 }
 
 impl CourseAnnouncementHandle {
-    pub fn id   (&self) -> &str { &self.meta.id   }
-    pub fn title(&self) -> &str { &self.meta.title}
-    pub fn time (&self) -> &str { &self.meta.time }
+    pub fn id(&self) -> &str {
+        &self.meta.id
+    }
+    pub fn title(&self) -> &str {
+        &self.meta.title
+    }
+    pub fn time(&self) -> &str {
+        &self.meta.time
+    }
 
     pub async fn get(&self) -> anyhow::Result<CourseAnnouncement> {
         // 真正请求正文页
-        let dom = self.client.get_by_uri(&self.meta.href).await?.text().await?;
+        let dom = self
+            .client
+            .get_by_uri(&self.meta.href)
+            .await?
+            .text()
+            .await?;
         // …解析正文、图片、附件…
         Ok(CourseAnnouncement {
-            client : self.client.clone(),
-            course : self.course.clone(),
-            meta   : self.meta.clone(),
-            html   : dom.into(),
+            client: self.client.clone(),
+            course: self.course.clone(),
+            meta: self.meta.clone(),
+            html: dom.into(),
         })
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct CourseAnnouncement {
-    client : Client,
-    course : Arc<CourseMeta>,
-    meta   : Arc<CourseAnnouncementMeta>,
-    html   : String,                      // ↓ 可延迟解析
+    client: Client,
+    course: Arc<CourseMeta>,
+    meta: Arc<CourseAnnouncementMeta>,
+    html: String, // ↓ 可延迟解析
 }
 impl CourseAnnouncement {
     /// 原始 HTML 字符串（只读）
@@ -1804,13 +1866,13 @@ impl CourseVideoHandle {
     pub fn id(&self) -> String {
         // meta.url 形如 https://...player.html?course_id=_80167_1&sub_id=abc123&app_id=4
         let sub_id = Url::parse(&self.meta.url)
-            .ok()                                    // Result → Option
+            .ok() // Result → Option
             .and_then(|u| {
                 u.query_pairs()
-                 .find(|(k, _)| k == "sub_id")       // 找到 sub_id
-                 .map(|(_, v)| v.to_string())
+                    .find(|(k, _)| k == "sub_id") // 找到 sub_id
+                    .map(|(_, v)| v.to_string())
             })
-            .unwrap_or_default();                    // 若解析失败给空串
+            .unwrap_or_default(); // 若解析失败给空串
 
         format!("{}::{}", self.course.id, sub_id)
     }
@@ -1823,8 +1885,12 @@ impl CourseVideoHandle {
         self.meta.time.hash(&mut h);
         format!("{:x}", h.finish())
     }
-    pub fn title(&self) -> &str { self.meta.title() }
-    pub fn time(&self)  -> &str { self.meta.time()  }
+    pub fn title(&self) -> &str {
+        self.meta.title()
+    }
+    pub fn time(&self) -> &str {
+        self.meta.time()
+    }
 
     pub fn meta(&self) -> &CourseVideoMeta {
         &self.meta

@@ -188,8 +188,10 @@ pub async fn download(
     let items = fetch_assignments(force, all, cur_term).await?;
     let a = match id {
         // Some(id) => match items.into_iter().find(|x| x.1 == id) {
-        Some(id) => match items.into_iter().find(|x| x.1 == id
-            || x.2.id_legacy() == id) {
+        Some(id) => match items
+            .into_iter()
+            .find(|x| x.1 == id || x.2.id_legacy() == id)
+        {
             Some(r) => r,
             None => anyhow::bail!("assignment with id {} not found", id),
         },
@@ -233,8 +235,10 @@ pub async fn submit(id: Option<&str>, path: Option<&std::path::Path>) -> anyhow:
 
     let (c, _, a) = match id {
         // Some(id) => match items.into_iter().find(|x| x.1 == id) {
-        Some(id) => match items.into_iter().find(|x| x.1 == id
-            || x.2.id_legacy() == id) {
+        Some(id) => match items
+            .into_iter()
+            .find(|x| x.1 == id || x.2.id_legacy() == id)
+        {
             Some(r) => r,
             None => anyhow::bail!("assignment with id {} not found", id),
         },

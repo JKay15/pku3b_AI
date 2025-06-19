@@ -1,14 +1,16 @@
 //! pku3b_py – 2025-06 重构版
 use pyo3::prelude::*;
 use std::{cell::RefCell, collections::HashMap, path::PathBuf};
-use std::{fs, path::Path};   // ← 把 io::Write 补进来
+use std::{fs, path::Path}; // ← 把 io::Write 补进来
 
-use pku3b::utils;    
 use anyhow::Error;
 use compio::runtime::Runtime;
 use pku3b::api::{
-    Blackboard, Client, Course, CourseAssignment, CourseAssignmentHandle, CourseHandle, CourseVideoHandle,CourseVideo,CourseDocumentHandle, CourseDocument,CourseAnnouncement,CourseAnnouncementHandle
+    Blackboard, Client, Course, CourseAnnouncement, CourseAnnouncementHandle, CourseAssignment,
+    CourseAssignmentHandle, CourseDocument, CourseDocumentHandle, CourseHandle, CourseVideo,
+    CourseVideoHandle,
 };
+use pku3b::utils;
 
 // ───────────── ① 每线程唯一的 Compio Runtime ─────────────
 thread_local! {
@@ -31,8 +33,6 @@ fn anyhow_to_py(e: Error) -> PyErr {
     pyo3::exceptions::PyRuntimeError::new_err(format!("{e:?}"))
 }
 
-
-
 /*━━━━━━━━━━━━━━━━━━━━━━━━ ② PyClient ━━━━━━━━━━━━━━━━━━━━━━━*/
 
 #[pyclass]
@@ -50,8 +50,8 @@ impl PyClient {
     }
 
     fn login_blackboard(&self, user: String, pwd: String) -> PyResult<PyBlackboard> {
-        let bb = with_rt(|rt| rt.block_on(self.inner.blackboard(&user, &pwd)))
-            .map_err(anyhow_to_py)?;
+        let bb =
+            with_rt(|rt| rt.block_on(self.inner.blackboard(&user, &pwd))).map_err(anyhow_to_py)?;
         Ok(PyBlackboard { inner: bb })
     }
 
@@ -99,9 +99,10 @@ impl PyCourseHandle {
 impl PyBlackboard {
     /// 课程句柄列表（轻量，不触发进入课程页面）
     fn list_courses(&self) -> PyResult<Vec<PyCourseHandle>> {
-        let v = with_rt(|rt| rt.block_on(self.inner.get_courses(true)))
-            .map_err(anyhow_to_py)?;
-        Ok(v.into_iter().map(|h| PyCourseHandle { handle: h }).collect())
+        let v = with_rt(|rt| rt.block_on(self.inner.get_courses(true))).map_err(anyhow_to_py)?;
+        Ok(v.into_iter()
+            .map(|h| PyCourseHandle { handle: h })
+            .collect())
     }
     /// 便捷：按下标直接获取 `PyCourse`
     #[pyo3(name = "course")]
@@ -112,11 +113,10 @@ impl PyBlackboard {
             .get(index)
             .ok_or_else(|| pyo3::exceptions::PyIndexError::new_err("index out of range"))?
             .handle
-            .clone();                               // CourseHandle
+            .clone(); // CourseHandle
 
         // 进入课程，得到 PyCourse
-        let course = with_rt(|rt| rt.block_on(h.get()))
-            .map_err(anyhow_to_py)?;
+        let course = with_rt(|rt| rt.block_on(h.get())).map_err(anyhow_to_py)?;
         Ok(PyCourse { inner: course })
     }
 
@@ -160,12 +160,12 @@ impl PyCourse {
     /*—— 视频 ——*/
     #[pyo3(name = "list_videos")]
     fn list_videos(&self) -> PyResult<Vec<PyVideoHandle>> {
-        let handles = with_rt(|rt| rt.block_on(self.inner.list_videos()))
-            .map_err(anyhow_to_py)?;
+        let handles = with_rt(|rt| rt.block_on(self.inner.list_videos())).map_err(anyhow_to_py)?;
 
-        Ok(handles.into_iter()
-                  .map(|h| PyVideoHandle { handle: h })
-                  .collect())
+        Ok(handles
+            .into_iter()
+            .map(|h| PyVideoHandle { handle: h })
+            .collect())
     }
     // /*—— 文档 ——*/
     // fn list_documents(&self) -> PyResult<Vec<PyDocumentHandle>> {
@@ -179,110 +179,110 @@ impl PyCourse {
     // }
     /*—— 公告 ——*/
     fn list_announcements(&self) -> PyResult<Vec<PyAnnouncementHandle>> {
-        let v = with_rt(|rt| rt.block_on(self.inner.list_announcements()))
-                .map_err(anyhow_to_py)?;
-        Ok(v.into_iter().map(|h| PyAnnouncementHandle{ inner:h }).collect())
+        let v = with_rt(|rt| rt.block_on(self.inner.list_announcements())).map_err(anyhow_to_py)?;
+        Ok(v.into_iter()
+            .map(|h| PyAnnouncementHandle { inner: h })
+            .collect())
     }
-     /*—— 作业（带层级信息） ——*/
+    /*—— 作业（带层级信息） ——*/
     // fn list_assignments_with_hierarchy(&self) -> PyResult<Vec<PyAssignmentHandle>> {
     //     let (handles, depths, parent_ids) = with_rt(|rt| rt.block_on(
     //         self.inner.list_assignments_with_hierarchy()
     //     ))
     //     .map_err(anyhow_to_py)?;
-        
+
     //     let results = handles.into_iter()
     //         .zip(depths)
     //         .zip(parent_ids)
     //         .map(|((handle, depth), parent_id)| {
-    //             PyAssignmentHandle { 
-    //                 handle, 
+    //             PyAssignmentHandle {
+    //                 handle,
     //                 depth,
     //                 parent_id
     //             }
     //         })
     //         .collect();
-            
+
     //     Ok(results)
     // }
     /// 获取作业及其层级信息
     fn list_assignments_with_hierarchy(&self) -> PyResult<Vec<PyAssignmentHandle>> {
-        let handles = with_rt(|rt| rt.block_on(
-            self.inner.list_assignments_with_hierarchy()
-        ))
-        .map_err(anyhow_to_py)?;
-        
-        Ok(handles.into_iter()
+        let handles = with_rt(|rt| rt.block_on(self.inner.list_assignments_with_hierarchy()))
+            .map_err(anyhow_to_py)?;
+
+        Ok(handles
+            .into_iter()
             .map(|h| PyAssignmentHandle { handle: h })
             .collect())
     }
-    
+
     /*—— 文档（带层级信息） ——*/
     // fn list_documents_with_hierarchy(&self) -> PyResult<Vec<PyDocumentHandle>> {
     //     let (handles, depths, parent_ids) = with_rt(|rt| rt.block_on(
     //         self.inner.list_documents_with_hierarchy()
     //     ))
     //     .map_err(anyhow_to_py)?;
-        
+
     //     let results = handles.into_iter()
     //         .zip(depths)
     //         .zip(parent_ids)
     //         .map(|((handle, depth), parent_id)| {
-    //             PyDocumentHandle { 
-    //                 handle, 
+    //             PyDocumentHandle {
+    //                 handle,
     //                 depth,
     //                 parent_id
     //             }
     //         })
     //         .collect();
-            
+
     //     Ok(results)
     // }
     /*—— 文档（带层级信息） ——*/
     fn list_documents_with_hierarchy(&self) -> PyResult<Vec<PyDocumentHandle>> {
-        let result = with_rt(|rt| rt.block_on(
-            self.inner.list_documents_with_hierarchy()
-        ))
-        .map_err(anyhow_to_py)?;
-        
+        let result = with_rt(|rt| rt.block_on(self.inner.list_documents_with_hierarchy()))
+            .map_err(anyhow_to_py)?;
+
         // 提取元组中的各部分
         let (handles, depths, parent_ids) = result;
-        
+
         // 合并结果
-        let results = handles.into_iter()
+        let results = handles
+            .into_iter()
             .zip(depths.into_iter())
             .zip(parent_ids.into_iter())
-            .map(|((handle, depth), parent_id)| {
-                PyDocumentHandle { 
-                    handle, 
-                }
-            })
+            .map(|((handle, depth), parent_id)| PyDocumentHandle { handle })
             .collect();
-            
+
         Ok(results)
     }
 }
 /*━━━━━━━━━━━━━━━━━━━━━━ ⑤ PyAssignmentHandler ━━━━━━━━━━━━━━━━━━━━*/
 #[pyclass]
 #[derive(Clone)]
-pub struct PyAssignmentHandle { 
-    handle: CourseAssignmentHandle ,
+pub struct PyAssignmentHandle {
+    handle: CourseAssignmentHandle,
 }
 
 #[pymethods]
 impl PyAssignmentHandle {
-    #[getter] fn id(&self)    -> String { self.handle.id() }
-    #[getter] fn title(&self) -> String { self.handle.title().to_string() }
+    #[getter]
+    fn id(&self) -> String {
+        self.handle.id()
+    }
+    #[getter]
+    fn title(&self) -> String {
+        self.handle.title().to_string()
+    }
     // #[getter] fn depth(&self) -> usize { self.depth }
     // #[getter] fn parent_id(&self) -> Option<String> { self.parent_id.clone() }
-    #[getter] 
-    fn parent_title(&self) -> Option<String> { 
+    #[getter]
+    fn parent_title(&self) -> Option<String> {
         self.handle.content.parent_title.clone()
     }
-    #[getter] 
-    fn section_name(&self) -> Option<String> { 
+    #[getter]
+    fn section_name(&self) -> Option<String> {
         self.handle.content.section_name.clone()
     }
-    
 
     // fn get(&self) -> PyResult<PyAssignment> {
     //     // let a = with_rt(|rt| rt.block_on(self.handle.get()))
@@ -290,18 +290,17 @@ impl PyAssignmentHandle {
     //     // Ok(PyAssignment { inner: a })
     //     let a = with_rt(|rt| rt.block_on(self.handle.clone().get()))
     //         .map_err(anyhow_to_py)?;
-    //     Ok(PyAssignment { 
+    //     Ok(PyAssignment {
     //         inner: a,
     //         depth: self.depth,               // 传递深度信息
     //         parent_id: self.parent_id.clone() // 传递父节点ID
     //     })
     // }
     fn get(&self) -> PyResult<PyAssignment> {
-        let assignment = with_rt(|rt| rt.block_on(self.handle.get()))
-            .map_err(anyhow_to_py)?;
-            
+        let assignment = with_rt(|rt| rt.block_on(self.handle.get())).map_err(anyhow_to_py)?;
+
         // 将层级信息传递给完整对象
-        Ok(PyAssignment { 
+        Ok(PyAssignment {
             inner: assignment,
             // depth: self.handle.content.depth,
             // parent_id: self.handle.content.parent_id.clone(),
@@ -337,18 +336,18 @@ impl PyAssignment {
         self.inner.descriptions().to_vec()
     }
 
-    #[getter] 
-    fn parent_title(&self) -> Option<String> { 
-        self.parent_title.clone() 
+    #[getter]
+    fn parent_title(&self) -> Option<String> {
+        self.parent_title.clone()
     }
-    
-    #[getter] 
-    fn section_name(&self) -> Option<String> { 
-        self.section_name.clone() 
+
+    #[getter]
+    fn section_name(&self) -> Option<String> {
+        self.section_name.clone()
     }
 
     fn download_all(&self, dst: String) -> PyResult<()> {
-        let dst = PathBuf::from(dst);      // ← 改为可变
+        let dst = PathBuf::from(dst); // ← 改为可变
         for (name, uri) in self.inner.attachments() {
             with_rt(|rt| rt.block_on(self.inner.download_attachment(uri, &dst.join(name))))
                 .map_err(anyhow_to_py)?;
@@ -357,11 +356,8 @@ impl PyAssignment {
     }
 
     fn upload(&self, file_path: String) -> PyResult<()> {
-        with_rt(|rt| rt.block_on(
-            self.inner
-                .submit_file(std::path::Path::new(&file_path)),
-        ))
-        .map_err(anyhow_to_py)
+        with_rt(|rt| rt.block_on(self.inner.submit_file(std::path::Path::new(&file_path))))
+            .map_err(anyhow_to_py)
     }
 
     fn deadline_raw(&self) -> Option<String> {
@@ -371,41 +367,64 @@ impl PyAssignment {
 /*━━━━━━━━━━━━━━━━━━━━━━ ⑤ PyVideoHandler ━━━━━━━━━━━━━━━━━━━━*/
 #[pyclass]
 #[derive(Clone)]
-pub struct PyVideoHandle { handle: CourseVideoHandle }
+pub struct PyVideoHandle {
+    handle: CourseVideoHandle,
+}
 
 #[pymethods]
 impl PyVideoHandle {
-    #[getter] fn id(&self)    -> String { self.handle.id() }
-    #[getter] fn title(&self) -> String { self.handle.title().to_string() }
-    #[getter] fn time(&self)  -> String { self.handle.time().to_string() }
+    #[getter]
+    fn id(&self) -> String {
+        self.handle.id()
+    }
+    #[getter]
+    fn title(&self) -> String {
+        self.handle.title().to_string()
+    }
+    #[getter]
+    fn time(&self) -> String {
+        self.handle.time().to_string()
+    }
 
     fn get(&self) -> PyResult<PyVideo> {
-        let v = with_rt(|rt| rt.block_on(self.handle.get()))
-            .map_err(anyhow_to_py)?;
+        let v = with_rt(|rt| rt.block_on(self.handle.get())).map_err(anyhow_to_py)?;
         Ok(PyVideo { inner: v })
     }
 }
 /*━━━━━━━━━━━━━━━━━━━━━━━ ⑤ PyVideo ━━━━━━━━━━━━━━━━━━━━*/
 #[pyclass]
-pub struct PyVideo { inner: CourseVideo }
+pub struct PyVideo {
+    inner: CourseVideo,
+}
 
 #[pymethods]
 impl PyVideo {
-    #[getter] fn course(&self) -> String { self.inner.course_name().to_string() }
-    #[getter] fn title (&self) -> String { self.inner.meta().title().to_string() }
-    #[getter] fn len   (&self) -> usize  { self.inner.len_segments() }
+    #[getter]
+    fn course(&self) -> String {
+        self.inner.course_name().to_string()
+    }
+    #[getter]
+    fn title(&self) -> String {
+        self.inner.meta().title().to_string()
+    }
+    #[getter]
+    fn len(&self) -> usize {
+        self.inner.len_segments()
+    }
 
     /// download(dst_dir:str, to_mp4:bool=False) -> str
     #[pyo3(name = "download")]
     fn download(&self, dst: String, to_mp4: Option<bool>) -> PyResult<String> {
-        let dst  = PathBuf::from(dst);
-        if !dst.exists() { std::fs::create_dir_all(&dst).map_err(|e| anyhow_to_py(e.into()))?; }
+        let dst = PathBuf::from(dst);
+        if !dst.exists() {
+            std::fs::create_dir_all(&dst).map_err(|e| anyhow_to_py(e.into()))?;
+        }
 
         /* ---------- 1. 准备缓存工作目录 ---------- */
         let cache_dir = utils::projectdir()
             .cache_dir()
             .join("video_download")
-            .join(self.inner.meta().title());          // stable-id 更好
+            .join(self.inner.meta().title()); // stable-id 更好
         std::fs::create_dir_all(&cache_dir).ok();
 
         /* ---------- 2. 如果缺少片段才下载 ---------- */
@@ -416,9 +435,8 @@ impl PyVideo {
             let seg_path = cache_dir.join(format!("{:05}.ts", i));
 
             if !seg_path.exists() {
-                let data = with_rt(|rt| rt.block_on(
-                    self.inner.get_segment_data(i, key)
-                )).map_err(anyhow_to_py)?;
+                let data = with_rt(|rt| rt.block_on(self.inner.get_segment_data(i, key)))
+                    .map_err(anyhow_to_py)?;
                 std::fs::write(&seg_path, data).map_err(|e| anyhow_to_py(e.into()))?;
             }
             paths.push(seg_path);
@@ -442,8 +460,14 @@ impl PyVideo {
             let mp4 = dst.join(format!("{}.mp4", self.inner.meta().title()));
             let status = std::process::Command::new("ffmpeg")
                 .args([
-                    "-y", "-hide_banner", "-loglevel", "quiet",
-                    "-i", merged.to_str().unwrap(), "-c", "copy",
+                    "-y",
+                    "-hide_banner",
+                    "-loglevel",
+                    "quiet",
+                    "-i",
+                    merged.to_str().unwrap(),
+                    "-c",
+                    "copy",
                 ])
                 .arg(&mp4)
                 .status()
@@ -471,7 +495,7 @@ fn dir_size(p: &Path) -> u64 {
         for entry in rd.flatten() {
             match entry.metadata() {
                 Ok(md) if md.is_file() => sum += md.len(),
-                Ok(md) if md.is_dir()  => sum += dir_size(&entry.path()),
+                Ok(md) if md.is_dir() => sum += dir_size(&entry.path()),
                 _ => {}
             }
         }
@@ -489,18 +513,18 @@ fn cache_size_gb() -> PyResult<f64> {
 #[pyfunction]
 fn cache_clean() -> PyResult<f64> {
     let dir = utils::projectdir().cache_dir().to_path_buf();
-    let freed = cache_size_gb()?;         // 先记下大小
+    let freed = cache_size_gb()?; // 先记下大小
     if dir.exists() {
         fs::remove_dir_all(&dir).map_err(|e| anyhow_to_py(e.into()))?;
     }
-    fs::create_dir_all(&dir).ok();        // 重建空目录
+    fs::create_dir_all(&dir).ok(); // 重建空目录
     Ok(freed)
 }
 
 /*━━━━━━━━━━━━━━ ⑤ PyDocumentHandle ━━━━━━━━━━━━━*/
 #[pyclass]
 #[derive(Clone)]
-pub struct PyDocumentHandle { 
+pub struct PyDocumentHandle {
     handle: CourseDocumentHandle,
     // depth: usize,
     // parent_id: Option<String>,
@@ -508,27 +532,32 @@ pub struct PyDocumentHandle {
 
 #[pymethods]
 impl PyDocumentHandle {
-    #[getter] fn id   (&self) -> String { self.handle.id()     }
-    #[getter] fn title(&self) -> String { self.handle.title().to_string() }
+    #[getter]
+    fn id(&self) -> String {
+        self.handle.id()
+    }
+    #[getter]
+    fn title(&self) -> String {
+        self.handle.title().to_string()
+    }
     // #[getter] fn depth(&self) -> usize { self.depth }
     // #[getter] fn parent_id(&self) -> Option<String> { self.parent_id.clone() }
-    
-    #[getter] 
-    fn parent_title(&self) -> Option<String> { 
+
+    #[getter]
+    fn parent_title(&self) -> Option<String> {
         self.handle.content.parent_title.clone()
     }
-    
-    #[getter] 
-    fn section_name(&self) -> Option<String> { 
+
+    #[getter]
+    fn section_name(&self) -> Option<String> {
         self.handle.content.section_name.clone()
     }
     fn get(&self) -> PyResult<PyDocument> {
         // let d = with_rt(|rt| rt.block_on(self.handle.get()))
         //     .map_err(anyhow_to_py)?;
         // Ok(PyDocument { inner: d })
-        let d = with_rt(|rt| rt.block_on(self.handle.clone().get()))
-            .map_err(anyhow_to_py)?;
-        Ok(PyDocument { 
+        let d = with_rt(|rt| rt.block_on(self.handle.clone().get())).map_err(anyhow_to_py)?;
+        Ok(PyDocument {
             inner: d,
             // depth: self.depth,                // 传递深度信息
             // parent_id: self.parent_id.clone()  // 传递父节点ID
@@ -538,55 +567,77 @@ impl PyDocumentHandle {
 
 /* ---------- PyDocument (正文 + 附件) ---------- */
 #[pyclass]
-pub struct PyDocument { 
-    inner: CourseDocument ,
+pub struct PyDocument {
+    inner: CourseDocument,
     // depth: usize,
     // parent_id: Option<String>,
 }
 
 #[pymethods]
 impl PyDocument {
-    #[getter] fn title(&self) -> String { self.inner.title().to_string() }
-    #[getter]fn descriptions(&self) -> Vec<String> { self.inner.descriptions().to_vec() }
-    #[getter] 
-    fn parent_title(&self) -> Option<String> { 
+    #[getter]
+    fn title(&self) -> String {
+        self.inner.title().to_string()
+    }
+    #[getter]
+    fn descriptions(&self) -> Vec<String> {
+        self.inner.descriptions().to_vec()
+    }
+    #[getter]
+    fn parent_title(&self) -> Option<String> {
         self.inner.content.parent_title.clone()
     }
-    
-    #[getter] 
-    fn section_name(&self) -> Option<String> { 
+
+    #[getter]
+    fn section_name(&self) -> Option<String> {
         self.inner.content.section_name.clone()
     }
-    fn attachments  (&self) -> Vec<(String,String)> { self.inner.attachments().to_vec() }
+    fn attachments(&self) -> Vec<(String, String)> {
+        self.inner.attachments().to_vec()
+    }
 
     /// download_all(dst_dir:str)
     fn download_all(&self, dst: String) -> PyResult<()> {
-        let dst = PathBuf::from(dst);      // ← 改为可变
+        let dst = PathBuf::from(dst); // ← 改为可变
         std::fs::create_dir_all(&dst).ok();
         for (name, uri) in self.inner.attachments() {
-            with_rt(|rt| rt.block_on(
-                self.inner.download_attachment(uri, &dst.join(name))
-            ))
-            .map_err(anyhow_to_py)?;
+            with_rt(|rt| rt.block_on(self.inner.download_attachment(uri, &dst.join(name))))
+                .map_err(anyhow_to_py)?;
         }
         Ok(())
     }
 }
 
 #[pyclass]
-pub struct PyAnnouncementHandle { inner: CourseAnnouncementHandle }
-#[pymethods] impl PyAnnouncementHandle {
-    #[getter] fn id   (&self)->String{ self.inner.id().to_string() }
-    #[getter] fn time (&self)->String{ self.inner.time().to_string()}
-    #[getter] fn title(&self)->String{ self.inner.title().to_string()}
-    fn get(&self) -> PyResult<PyAnnouncement>{
-        Ok( PyAnnouncement {
-            inner: with_rt(|rt| rt.block_on(self.inner.get())).map_err(anyhow_to_py)?
+pub struct PyAnnouncementHandle {
+    inner: CourseAnnouncementHandle,
+}
+#[pymethods]
+impl PyAnnouncementHandle {
+    #[getter]
+    fn id(&self) -> String {
+        self.inner.id().to_string()
+    }
+    #[getter]
+    fn time(&self) -> String {
+        self.inner.time().to_string()
+    }
+    #[getter]
+    fn title(&self) -> String {
+        self.inner.title().to_string()
+    }
+    fn get(&self) -> PyResult<PyAnnouncement> {
+        Ok(PyAnnouncement {
+            inner: with_rt(|rt| rt.block_on(self.inner.get())).map_err(anyhow_to_py)?,
         })
     }
 }
-#[pyclass] pub struct PyAnnouncement { inner: CourseAnnouncement }
-#[pymethods] impl PyAnnouncement {
+#[pyclass]
+pub struct PyAnnouncement {
+    inner: CourseAnnouncement,
+}
+#[pymethods]
+impl PyAnnouncement {
     /// 获取通知原始 HTML
     #[pyo3(name = "html")]
     fn html(&self) -> String {
@@ -610,6 +661,6 @@ fn pku3b_py(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_class::<PyDocumentHandle>()?;
     m.add_class::<PyDocument>()?;
     m.add_function(wrap_pyfunction!(cache_size_gb, m)?)?;
-    m.add_function(wrap_pyfunction!(cache_clean,   m)?)?;
+    m.add_function(wrap_pyfunction!(cache_clean, m)?)?;
     Ok(())
 }
