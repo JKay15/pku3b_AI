@@ -1,7 +1,7 @@
 name: Rust + Python CI
 
 on:
-  push:        # 任意 push 都跑
+  push:
     branches: ["**"]
   pull_request:
     branches: ["main"]
@@ -9,26 +9,18 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
-    # 如需同时测 3.11、3.12，自行把数组扩展
     strategy:
       matrix:
         python-version: ["3.12"]
 
     steps:
-      # 1️⃣ 取代码
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
+      - uses: actions/checkout@v4
 
-      # 2️⃣ Python 环境
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "${{ matrix.python-version }}"
 
-      # 3️⃣ Rust 环境
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -36,34 +28,39 @@ jobs:
           profile: minimal
           override: true
 
-      # 4️⃣ 安装 maturin（用 pip 最简单）
       - name: Install maturin
         run: pip install maturin
 
-      # 5️⃣ Rust 代码能不能编译？
+      # ─────────────── Rust 编译检查 ───────────────
       - name: Cargo check (workspace)
         run: cargo check --workspace --all-targets
 
-      # 6️⃣ 进入 pku3b_py ➜ 构建 wheel
+      # ─────────────── 构建 Python wheel ───────────────
       - name: Build wheel with maturin
         run: |
-          cd pku3b_py
+          set -e
           maturin build --release \
-              --interpreter python${{ matrix.python-version }}
+            --manifest-path pku3b_py/Cargo.toml \
+            --interpreter python${{ matrix.python-version }}
+          echo "maturin finished ✅"
 
-      # 7️⃣ 看看 wheel 真生成了（调试用）
-      - name: List wheels
-        run: ls -l pku3b_py/target/wheels
+      # ─────────────── 列出 wheel (调试) ───────────────
+      - name: List produced wheels
+        run: |
+          ls -R pku3b_py/target || true
+          ls -l pku3b_py/target/wheels || true
 
-      # 8️⃣ 安装 wheel（这里用 shell 展开 *.whl，避免再次找不到文件）
+      # ─────────────── 安装 wheel ───────────────
       - name: Install wheel
         run: |
           pip install $(ls pku3b_py/target/wheels/*.whl)
 
-      # 9️⃣ 烟测——能 import 就算过
-      - name: Python smoke test
+      # ─────────────── 烟雾测试 ───────────────
+      - name: Import test
         run: |
           python - <<'PY'
-          import pku3b_py, sys
-          print("✅ pku3b_py imported; Python", sys.version)
+          import pku3b_py, sys, pathlib
+          print("✅  imported pku3b_py:", pku3b_py.__name__)
+          print("   Python version   :", sys.version)
+          print("   Wheel location   :", pathlib.Path(pku3b_py.__file__).parent)
           PY
