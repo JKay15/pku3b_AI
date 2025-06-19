@@ -1,7 +1,7 @@
 //! pku3b_py – 2025-06 重构版
 use pyo3::prelude::*;
 use std::{cell::RefCell, collections::HashMap, path::PathBuf};
-use std::{io::Write, fs, path::Path};   // ← 把 io::Write 补进来
+use std::{fs, path::Path};   // ← 把 io::Write 补进来
 
 use pku3b::utils;    
 use anyhow::Error;
@@ -348,7 +348,7 @@ impl PyAssignment {
     }
 
     fn download_all(&self, dst: String) -> PyResult<()> {
-        let mut dst = PathBuf::from(dst);      // ← 改为可变
+        let dst = PathBuf::from(dst);      // ← 改为可变
         for (name, uri) in self.inner.attachments() {
             with_rt(|rt| rt.block_on(self.inner.download_attachment(uri, &dst.join(name))))
                 .map_err(anyhow_to_py)?;
@@ -561,7 +561,7 @@ impl PyDocument {
 
     /// download_all(dst_dir:str)
     fn download_all(&self, dst: String) -> PyResult<()> {
-        let mut dst = PathBuf::from(dst);      // ← 改为可变
+        let dst = PathBuf::from(dst);      // ← 改为可变
         std::fs::create_dir_all(&dst).ok();
         for (name, uri) in self.inner.attachments() {
             with_rt(|rt| rt.block_on(

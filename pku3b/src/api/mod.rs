@@ -14,7 +14,6 @@ use std::{
     str::FromStr,
     sync::Arc,
 };
-use compio::runtime::Runtime;
 use crate::{
     multipart, qs,
     utils::{with_cache, with_cache_bytes},
@@ -818,7 +817,7 @@ impl CourseContentStream {
                             probe.depth,
                             probe.section_name.as_deref(),
                         ) {
-                            Ok(mut data) => {
+                            Ok(data) => {
                                 // 更新层级映射
                                 self.parent_map.insert(data.id.clone(), Some(probe.id.clone()));
                                 self.depth_map.insert(data.id.clone(), data.depth);
