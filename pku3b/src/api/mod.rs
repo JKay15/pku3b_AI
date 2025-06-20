@@ -579,7 +579,7 @@ pub struct CourseContentStream {
     client: Client,
     course: Arc<CourseMeta>,
     visited_ids: HashSet<String>,
-    probe_queue: VecDeque<ContentProbe>, 
+    probe_queue: VecDeque<ContentProbe>,
     parent_map: HashMap<String, Option<String>>,
     depth_map: HashMap<String, usize>,
 }
@@ -762,7 +762,6 @@ pub struct CourseContentData {
     pub section_name: Option<String>, // 新增：所属栏目名称（如"课程课件"）
     pub is_folder: bool,              // 是否是文件夹
 }
-
 
 impl CourseContentData {
     pub fn is_folder(&self) -> bool {

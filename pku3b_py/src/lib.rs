@@ -83,6 +83,7 @@ impl PyCourseHandle {
     fn title(&self) -> String {
         self.handle.title().to_string()
     }
+
     #[getter]
     fn id(&self) -> String {
         self.handle.id().to_string()
@@ -145,18 +146,11 @@ impl PyCourse {
     }
 
     /// 左侧菜单 HashMap<title, url>
+    #[getter]
     fn entries(&self) -> HashMap<String, String> {
         self.inner.entries().clone()
     }
 
-    // /*—— 作业 ——*/
-    // fn list_assignments(&self) -> PyResult<Vec<PyAssignmentHandle>> {
-    //     let handles = with_rt(|rt| rt.block_on(self.inner.list_assignments()))
-    //         .map_err(anyhow_to_py)?;
-    //     Ok(handles.into_iter()
-    //         .map(|h| PyAssignmentHandle { handle: h })
-    //         .collect())
-    // }
     /*—— 视频 ——*/
     #[pyo3(name = "list_videos")]
     fn list_videos(&self) -> PyResult<Vec<PyVideoHandle>> {
@@ -167,16 +161,6 @@ impl PyCourse {
             .map(|h| PyVideoHandle { handle: h })
             .collect())
     }
-    // /*—— 文档 ——*/
-    // fn list_documents(&self) -> PyResult<Vec<PyDocumentHandle>> {
-    //     let handles = with_rt(|rt| rt.block_on(self.inner.list_documents()))
-    //         .map_err(anyhow_to_py)?;
-
-    //     Ok(handles
-    //         .into_iter()
-    //         .map(|h| PyDocumentHandle { handle: h })
-    //         .collect())
-    // }
     /*—— 公告 ——*/
     fn list_announcements(&self) -> PyResult<Vec<PyAnnouncementHandle>> {
         let v = with_rt(|rt| rt.block_on(self.inner.list_announcements())).map_err(anyhow_to_py)?;
@@ -185,28 +169,7 @@ impl PyCourse {
             .collect())
     }
     /*—— 作业（带层级信息） ——*/
-    // fn list_assignments_with_hierarchy(&self) -> PyResult<Vec<PyAssignmentHandle>> {
-    //     let (handles, depths, parent_ids) = with_rt(|rt| rt.block_on(
-    //         self.inner.list_assignments_with_hierarchy()
-    //     ))
-    //     .map_err(anyhow_to_py)?;
-
-    //     let results = handles.into_iter()
-    //         .zip(depths)
-    //         .zip(parent_ids)
-    //         .map(|((handle, depth), parent_id)| {
-    //             PyAssignmentHandle {
-    //                 handle,
-    //                 depth,
-    //                 parent_id
-    //             }
-    //         })
-    //         .collect();
-
-    //     Ok(results)
-    // }
-    /// 获取作业及其层级信息
-    fn list_assignments_with_hierarchy(&self) -> PyResult<Vec<PyAssignmentHandle>> {
+    fn list_assignments(&self) -> PyResult<Vec<PyAssignmentHandle>> {
         let handles = with_rt(|rt| rt.block_on(self.inner.list_assignments_with_hierarchy()))
             .map_err(anyhow_to_py)?;
 
@@ -217,43 +180,14 @@ impl PyCourse {
     }
 
     /*—— 文档（带层级信息） ——*/
-    // fn list_documents_with_hierarchy(&self) -> PyResult<Vec<PyDocumentHandle>> {
-    //     let (handles, depths, parent_ids) = with_rt(|rt| rt.block_on(
-    //         self.inner.list_documents_with_hierarchy()
-    //     ))
-    //     .map_err(anyhow_to_py)?;
-
-    //     let results = handles.into_iter()
-    //         .zip(depths)
-    //         .zip(parent_ids)
-    //         .map(|((handle, depth), parent_id)| {
-    //             PyDocumentHandle {
-    //                 handle,
-    //                 depth,
-    //                 parent_id
-    //             }
-    //         })
-    //         .collect();
-
-    //     Ok(results)
-    // }
-    /*—— 文档（带层级信息） ——*/
-    fn list_documents_with_hierarchy(&self) -> PyResult<Vec<PyDocumentHandle>> {
-        let result = with_rt(|rt| rt.block_on(self.inner.list_documents_with_hierarchy()))
+    fn list_documents(&self) -> PyResult<Vec<PyDocumentHandle>> {
+        let (handles, _, _) = with_rt(|rt| rt.block_on(self.inner.list_documents_with_hierarchy()))
             .map_err(anyhow_to_py)?;
 
-        // 提取元组中的各部分
-        let (handles, depths, parent_ids) = result;
-
-        // 合并结果
-        let results = handles
+        Ok(handles
             .into_iter()
-            .zip(depths.into_iter())
-            .zip(parent_ids.into_iter())
-            .map(|((handle, depth), parent_id)| PyDocumentHandle { handle })
-            .collect();
-
-        Ok(results)
+            .map(|h| PyDocumentHandle { handle: h })
+            .collect())
     }
 }
 /*━━━━━━━━━━━━━━━━━━━━━━ ⑤ PyAssignmentHandler ━━━━━━━━━━━━━━━━━━━━*/
@@ -269,41 +203,28 @@ impl PyAssignmentHandle {
     fn id(&self) -> String {
         self.handle.id()
     }
+
     #[getter]
     fn title(&self) -> String {
         self.handle.title().to_string()
     }
-    // #[getter] fn depth(&self) -> usize { self.depth }
-    // #[getter] fn parent_id(&self) -> Option<String> { self.parent_id.clone() }
+
     #[getter]
     fn parent_title(&self) -> Option<String> {
         self.handle.content.parent_title.clone()
     }
+
     #[getter]
     fn section_name(&self) -> Option<String> {
         self.handle.content.section_name.clone()
     }
 
-    // fn get(&self) -> PyResult<PyAssignment> {
-    //     // let a = with_rt(|rt| rt.block_on(self.handle.get()))
-    //     //     .map_err(anyhow_to_py)?;
-    //     // Ok(PyAssignment { inner: a })
-    //     let a = with_rt(|rt| rt.block_on(self.handle.clone().get()))
-    //         .map_err(anyhow_to_py)?;
-    //     Ok(PyAssignment {
-    //         inner: a,
-    //         depth: self.depth,               // 传递深度信息
-    //         parent_id: self.parent_id.clone() // 传递父节点ID
-    //     })
-    // }
     fn get(&self) -> PyResult<PyAssignment> {
         let assignment = with_rt(|rt| rt.block_on(self.handle.get())).map_err(anyhow_to_py)?;
 
         // 将层级信息传递给完整对象
         Ok(PyAssignment {
             inner: assignment,
-            // depth: self.handle.content.depth,
-            // parent_id: self.handle.content.parent_id.clone(),
             parent_title: self.handle.content.parent_title.clone(),
             section_name: self.handle.content.section_name.clone(),
         })
@@ -314,8 +235,6 @@ impl PyAssignmentHandle {
 #[pyclass]
 pub struct PyAssignment {
     inner: CourseAssignment,
-    // depth: usize,
-    // parent_id: Option<String>,
     parent_title: Option<String>,
     section_name: Option<String>,
 }
@@ -326,7 +245,7 @@ impl PyAssignment {
     fn title(&self) -> String {
         self.inner.title().to_string()
     }
-
+    #[getter]
     fn attachments(&self) -> Vec<(String, String)> {
         self.inner.attachments().to_vec()
     }
@@ -347,7 +266,7 @@ impl PyAssignment {
     }
 
     fn download_all(&self, dst: String) -> PyResult<()> {
-        let dst = PathBuf::from(dst); // ← 改为可变
+        let dst = PathBuf::from(dst);
         for (name, uri) in self.inner.attachments() {
             with_rt(|rt| rt.block_on(self.inner.download_attachment(uri, &dst.join(name))))
                 .map_err(anyhow_to_py)?;
@@ -355,7 +274,7 @@ impl PyAssignment {
         Ok(())
     }
 
-    fn upload(&self, file_path: String) -> PyResult<()> {
+    fn submit_file(&self, file_path: String) -> PyResult<()> {
         with_rt(|rt| rt.block_on(self.inner.submit_file(std::path::Path::new(&file_path))))
             .map_err(anyhow_to_py)
     }
@@ -377,10 +296,12 @@ impl PyVideoHandle {
     fn id(&self) -> String {
         self.handle.id()
     }
+
     #[getter]
     fn title(&self) -> String {
         self.handle.title().to_string()
     }
+
     #[getter]
     fn time(&self) -> String {
         self.handle.time().to_string()
@@ -412,7 +333,6 @@ impl PyVideo {
         self.inner.len_segments()
     }
 
-    /// download(dst_dir:str, to_mp4:bool=False) -> str
     #[pyo3(name = "download")]
     fn download(&self, dst: String, to_mp4: Option<bool>) -> PyResult<String> {
         let dst = PathBuf::from(dst);
@@ -526,8 +446,6 @@ fn cache_clean() -> PyResult<f64> {
 #[derive(Clone)]
 pub struct PyDocumentHandle {
     handle: CourseDocumentHandle,
-    // depth: usize,
-    // parent_id: Option<String>,
 }
 
 #[pymethods]
@@ -536,12 +454,11 @@ impl PyDocumentHandle {
     fn id(&self) -> String {
         self.handle.id()
     }
+
     #[getter]
     fn title(&self) -> String {
         self.handle.title().to_string()
     }
-    // #[getter] fn depth(&self) -> usize { self.depth }
-    // #[getter] fn parent_id(&self) -> Option<String> { self.parent_id.clone() }
 
     #[getter]
     fn parent_title(&self) -> Option<String> {
@@ -553,15 +470,8 @@ impl PyDocumentHandle {
         self.handle.content.section_name.clone()
     }
     fn get(&self) -> PyResult<PyDocument> {
-        // let d = with_rt(|rt| rt.block_on(self.handle.get()))
-        //     .map_err(anyhow_to_py)?;
-        // Ok(PyDocument { inner: d })
         let d = with_rt(|rt| rt.block_on(self.handle.clone().get())).map_err(anyhow_to_py)?;
-        Ok(PyDocument {
-            inner: d,
-            // depth: self.depth,                // 传递深度信息
-            // parent_id: self.parent_id.clone()  // 传递父节点ID
-        })
+        Ok(PyDocument { inner: d })
     }
 }
 
@@ -569,8 +479,6 @@ impl PyDocumentHandle {
 #[pyclass]
 pub struct PyDocument {
     inner: CourseDocument,
-    // depth: usize,
-    // parent_id: Option<String>,
 }
 
 #[pymethods]
@@ -592,6 +500,7 @@ impl PyDocument {
     fn section_name(&self) -> Option<String> {
         self.inner.content.section_name.clone()
     }
+    #[getter]
     fn attachments(&self) -> Vec<(String, String)> {
         self.inner.attachments().to_vec()
     }
@@ -618,10 +527,12 @@ impl PyAnnouncementHandle {
     fn id(&self) -> String {
         self.inner.id().to_string()
     }
+
     #[getter]
     fn time(&self) -> String {
         self.inner.time().to_string()
     }
+
     #[getter]
     fn title(&self) -> String {
         self.inner.title().to_string()
