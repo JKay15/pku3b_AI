@@ -16,7 +16,8 @@ pub mod style {
 }
 
 pub fn projectdir() -> directories::ProjectDirs {
-    directories::ProjectDirs::from("org", "sshwy", "pku3b").expect("could not find project directories")
+    directories::ProjectDirs::from("org", "sshwy", "pku3b")
+        .expect("could not find project directories")
 }
 
 pub fn default_config_path() -> std::path::PathBuf {

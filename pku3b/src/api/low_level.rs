@@ -95,12 +95,11 @@ impl LowLevelClient {
             .send()
             .await?;
         anyhow::ensure!(res.status().is_success(), "status not success");
-        
+
         let rbody = res.text().await?;
         let dom = scraper::Html::parse_document(&rbody);
         Ok(dom)
     }
-    
 
     /// 根据课程的 key 获取课程主页内容 ([`COURSE_INFO`])
     pub async fn bb_coursepage(&self, key: &str) -> anyhow::Result<Html> {
