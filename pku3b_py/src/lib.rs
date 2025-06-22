@@ -8,7 +8,7 @@ use compio::runtime::Runtime;
 use pku3b::api::{
     Blackboard, Client, Course, CourseAnnouncement, CourseAnnouncementHandle, CourseAssignment,
     CourseAssignmentHandle, CourseDocument, CourseDocumentHandle, CourseHandle, CourseVideo,
-    CourseVideoHandle,
+    CourseVideoHandle,CourseTreeNode, NodeKind,ContentHandle,
 };
 use pku3b::utils;
 
@@ -189,6 +189,13 @@ impl PyCourse {
             .map(|h| PyDocumentHandle { handle: h })
             .collect())
     }
+    /// 构建整棵课程内容树并返回根节点
+    fn build_tree(&self) -> PyResult<PyCourseTreeNode> {
+        let root = with_rt(|rt| rt.block_on(self.inner.build_tree()))
+            .map_err(anyhow_to_py)?;
+
+        Ok(PyCourseTreeNode { inner: root })
+    }
 }
 /*━━━━━━━━━━━━━━━━━━━━━━ ⑤ PyAssignmentHandler ━━━━━━━━━━━━━━━━━━━━*/
 #[pyclass]
@@ -265,7 +272,7 @@ impl PyAssignment {
         self.section_name.clone()
     }
 
-    fn download_all(&self, dst: String) -> PyResult<()> {
+    fn download(&self, dst: String) -> PyResult<()> {
         let dst = PathBuf::from(dst);
         for (name, uri) in self.inner.attachments() {
             with_rt(|rt| rt.block_on(self.inner.download_attachment(uri, &dst.join(name))))
@@ -506,7 +513,7 @@ impl PyDocument {
     }
 
     /// download_all(dst_dir:str)
-    fn download_all(&self, dst: String) -> PyResult<()> {
+    fn download(&self, dst: String) -> PyResult<()> {
         let dst = PathBuf::from(dst); // ← 改为可变
         std::fs::create_dir_all(&dst).ok();
         for (name, uri) in self.inner.attachments() {
@@ -557,6 +564,102 @@ impl PyAnnouncement {
     // TODO: 提供 markdown/plaintext 渲染、附件下载等
 }
 
+// ========== 末尾放在其他类之后 ==========
+#[pyclass]
+pub struct PyCourseTreeNode {
+    inner: CourseTreeNode,
+}
+
+#[pymethods]
+impl PyCourseTreeNode {
+    #[getter] fn id(&self) -> String   { self.inner.id().to_string() }
+    #[getter] fn title(&self) -> String{ self.inner.title().to_string() }
+    #[getter] fn kind(&self) -> String { format!("{:?}", self.inner.kind()) }
+
+    /// 子节点列表
+    #[getter]
+    fn children(&self) -> Vec<PyCourseTreeNode> {
+        self.inner
+            .children()
+            .iter()
+            .cloned()
+            .map(|c| PyCourseTreeNode { inner: c })
+            .collect()
+    }
+
+    /// 获取文档句柄（如果节点是文档类型）
+    fn get_document_handle(&self) -> Option<PyDocumentHandle> {
+        if let Some(ContentHandle::Document(handle)) = &self.inner.content_handle {
+            Some(PyDocumentHandle { handle: handle.clone() })
+        } else {
+            None        
+        }
+    }
+    
+    /// 获取作业句柄（如果节点是作业类型）
+    fn get_assignment_handle(&self) -> Option<PyAssignmentHandle> {
+        if let Some(ContentHandle::Assignment(handle)) = &self.inner.content_handle {
+            Some(PyAssignmentHandle { handle: handle.clone() })
+        } else {
+            None        }
+    }
+    
+    /// 获取视频句柄（如果节点是视频类型）
+    fn get_video_handle(&self) -> Option<PyVideoHandle> {
+        if let Some(ContentHandle::Video(handle)) = &self.inner.content_handle {
+            Some(PyVideoHandle { handle: handle.clone() })
+        } else {
+            None        }
+    }
+    
+    /// 获取公告句柄（如果节点是公告类型）
+    fn get_announcement_handle(&self) -> Option<PyAnnouncementHandle> {
+        if let Some(ContentHandle::Announcement(handle)) = &self.inner.content_handle {
+            Some(PyAnnouncementHandle { inner: handle.clone() })
+        } else {
+            None        }
+    }
+    
+    /// 递归查找节点（根据标题或ID）
+    fn find(&self, query: &str) -> Option<PyCourseTreeNode> {
+        // 检查当前节点是否匹配
+        if self.id() == query || self.title() == query {
+            return Some(PyCourseTreeNode { inner: self.inner.clone() });
+        }
+        
+        // 递归检查子节点
+        for child in self.children() {
+            if let Some(found) = child.find(query) {
+                return Some(found);
+            }
+        }
+        
+        None
+    }
+    
+    /// 按类型查找节点
+    fn find_by_kind(&self, kind: &str) -> Vec<PyCourseTreeNode> {
+        let mut results = Vec::new();
+        let current_kind = self.kind();
+        
+        // 检查当前节点是否匹配
+        if current_kind == kind {
+            results.push(PyCourseTreeNode { inner: self.inner.clone() });
+        }
+        
+        // 递归检查子节点
+        for child in self.children() {
+            results.extend(child.find_by_kind(kind));
+        }
+        
+        results
+    }
+
+    fn __repr__(&self) -> String {
+        format!("<Node {} {:?}>", self.inner.title(), self.inner.kind())
+    }
+}
+
 /*━━━━━━━━━━━━━━━━━━━━━━━ ⑥ Python 模块注册 ━━━━━━━━━━━━━━━━*/
 
 #[pymodule]
@@ -571,6 +674,7 @@ fn pku3b_py(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_class::<PyVideo>()?;
     m.add_class::<PyDocumentHandle>()?;
     m.add_class::<PyDocument>()?;
+    m.add_class::<PyCourseTreeNode>()?;
     m.add_function(wrap_pyfunction!(cache_size_gb, m)?)?;
     m.add_function(wrap_pyfunction!(cache_clean, m)?)?;
     Ok(())
