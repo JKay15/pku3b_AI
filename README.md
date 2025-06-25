@@ -58,6 +58,106 @@
 
 ---
 
+### 🧪 使用示例（Python）
+
+以下为 pku3b_py 的标准使用流程，展示课程访问、模块内容下载、树结构调用等常见场景。
+
+### 🛜 登录教学网
+
+```python
+from pku3b_py import PyClient
+
+client = PyClient()
+bb = client.login_blackboard("学号", "密码")
+```
+
+### 📚 列出课程并进入第一个课程
+
+```python
+course = bb.course(0)
+print("课程名:", course.title)
+```
+
+### 🗂️ 获取课程左侧菜单 entries
+
+```python
+print(course.entries)
+# 返回如：{"教学资料": "/webapps/xx", "作业提交": "/webapps/yy"}
+```
+
+### 📄 下载课程文档
+
+```python
+docs = course.list_documents()
+for doc_handle in docs:
+    doc = doc_handle.get()
+    print(doc.title)
+    doc.download("./downloads/文档")
+```
+
+### 📢 下载课程通知（含正文和附件）
+
+```python
+anns = course.list_announcements()
+for ann_handle in anns:
+    ann = ann_handle.get()
+    print("📢", ann.title)
+    ann.download("./downloads/通知")
+```
+
+### 📝 下载课程作业附件并提交
+
+```python
+assignments = course.list_assignments()
+for assn_handle in assignments:
+    assn = assn_handle.get()
+    print("📝", assn.title)
+    assn.download("./downloads/作业")
+    # assn.submit_file("你的作业路径.pdf")
+```
+
+### 🎬 下载课程视频（支持转 mp4）
+
+```python
+videos = course.list_videos()
+for video_handle in videos:
+    video = video_handle.get()
+    print("🎬", video.title)
+    video.download("./downloads/视频", to_mp4=True)
+```
+
+### 🌳 使用内容树精确定位模块
+
+```python
+tree = course.build_tree()
+root = tree  # 根节点
+```
+
+####  🔍 查找“课程通知”模块的 Entry 节点
+
+```python
+target = root.find("课程通知")
+if target:
+    print("找到节点:", target.title)
+    for child in target.children:
+        print("📌 子节点:", child.title)
+        ann = child.get_announcement_handle().get()
+        ann.download("./downloads/树状通知")
+```
+
+你也可以访问其他模块，如文档、作业、视频：
+
+```python
+doc_node = root.find("教学资料").children[0]
+doc = doc_node.get_document_handle().get()
+doc.download("./downloads/树状文档")
+
+video_node = root.find_by_kind("Video")[0]
+video = video_node.get_video_handle().get()
+video.download("./downloads/树状视频")
+```
+
+
 
 ## 💻 前端方向（规划中）
 
