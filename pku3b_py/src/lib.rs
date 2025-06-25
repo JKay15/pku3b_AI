@@ -741,6 +741,8 @@ fn pku3b_py(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_class::<PyVideo>()?;
     m.add_class::<PyDocumentHandle>()?;
     m.add_class::<PyDocument>()?;
+    m.add_class::<PyAnnouncementHandle>()?;
+    m.add_class::<PyAnnouncement>()?;
     m.add_class::<PyCourseTreeNode>()?;
     m.add_function(wrap_pyfunction!(cache_size_gb, m)?)?;
     m.add_function(wrap_pyfunction!(cache_clean, m)?)?;
