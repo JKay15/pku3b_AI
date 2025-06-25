@@ -7,11 +7,13 @@ use crate::{
     utils::{with_cache, with_cache_bytes},
 };
 use anyhow::Context;
+use anyhow::{Result, anyhow}; // 正确导入anyhow宏
 use chrono::TimeZone;
 use cyper::IntoUrl;
 use futures_util::future::join_all;
 use itertools::Itertools;
 use scraper::ElementRef;
+use scraper::Html;
 use scraper::Selector;
 use std::pin::Pin;
 use std::{
@@ -499,70 +501,6 @@ impl Course {
         }
         Ok(docs)
     }
-    /// Blackboard 顶栏“课程通知”里的公告
-    pub async fn list_announcements(&self) -> anyhow::Result<Vec<CourseAnnouncementHandle>> {
-        // ① entry 标题 ≠ 一定叫“课程通知”
-        let (title_entry, url) = self
-            .entries()
-            .iter()
-            .find(|(k, _)| k.contains("通知") || k.contains("公告"))
-            .ok_or_else(|| anyhow::anyhow!("no announcement entry"))?; // 若真没有就返回空 Vec
-
-        // ② launch_link -> 302
-        let real = self.query_launch_link(url).await?;
-
-        // ③ 抓公告列表
-        let dom = self.client.get_by_uri(&real).await?.text().await?;
-        let doc = scraper::Html::parse_document(&dom);
-        let sel = scraper::Selector::parse("li.announcement").unwrap();
-
-        let list = doc
-            .select(&sel)
-            .filter_map(|li| {
-                let a_sel = scraper::Selector::parse("a").unwrap();
-                let span_sel = scraper::Selector::parse("span.date").unwrap();
-
-                let a = li.select(&a_sel).next()?;
-                let title = a.text().collect::<String>();
-                let href = a.value().attr("href")?.to_string();
-                let time = li.select(&span_sel).next()?.text().collect::<String>();
-
-                let id = href
-                    .split_once("annId=")
-                    .map(|(_, x)| x)
-                    .unwrap_or(&href)
-                    .to_string();
-
-                let content = CourseContentData {
-                    id: id.clone(),
-                    title: title.clone(),
-                    kind: CourseContentKind::Announcement, // ← 指明类型
-                    has_link: true,
-                    descriptions: vec![],
-                    attachments: vec![],
-                    parent_id: None,
-                    parent_title: Some(title_entry.clone()),
-                    depth: 0,
-                    section_name: Some(title_entry.clone()),
-                    is_folder: false,
-                };
-
-                Some(CourseAnnouncementHandle {
-                    content,
-                    client: self.client.clone(),
-                    meta: Arc::new(CourseAnnouncementMeta {
-                        id,
-                        title,
-                        time,
-                        href,
-                    }),
-                    course: self.meta.clone(),
-                })
-            })
-            .collect();
-
-        Ok(list)
-    }
 
     /// 带层级信息的作业列表
     pub async fn list_assignments_with_hierarchy(
@@ -615,111 +553,30 @@ impl Course {
 
         Ok((handles, depths, parent_ids))
     }
-    /// 构建“课程 → Entry → Folder/Leaf” 的完整树
-    // pub async fn build_tree(&self) -> anyhow::Result<CourseTreeNode> {
-    //     // ── 根节点：课程本身 ──
-    //     let mut root = CourseTreeNode::new(
-    //         self.meta.id().to_string(),
-    //         self.meta.title().to_string(),
-    //         NodeKind::Course,
-    //         None, // 根节点没有内容句柄
-    //     );
+    pub async fn list_announcements(&self) -> Result<Vec<CourseAnnouncementHandle>> {
+        let dom = self
+            .client
+            .0
+            .http_client
+            .bb_coursepage(&self.meta.id)
+            .await?;
 
-    //     // Entry 名 → 下标
-    //     let mut entry_map: HashMap<String, usize> = HashMap::new();
-    //     for (title, _url) in self.entries() {
-    //         let idx = root.children.len();
-    //         root.children.push(CourseTreeNode::new_basic(
-    //             title.clone(),
-    //             title.clone(),
-    //             NodeKind::Entry,
-    //         ));
-    //         entry_map.insert(title.to_string(), idx);
-    //     }
+        let list_selector = Selector::parse("ul.announcementList > li")
+            .map_err(|e| anyhow!("选择器错误: {}", e))?;
 
-    //     // 小工具：向树里塞叶子
-    //     let mut insert_leaf = |entry: &Option<String>,
-    //                            folder: Option<&str>,
-    //                            id: String,
-    //                            title: String,
-    //                            kind: NodeKind| {
-    //         // 1) 找/建 Entry
-    //         let entry_node: &mut CourseTreeNode =
-    //             match entry.as_ref().and_then(|t| entry_map.get(t).copied()) {
-    //                 Some(idx) => &mut root.children[idx],
-    //                 None => &mut root, // 没找到就挂根
-    //             };
+        let mut announcements = Vec::new();
+        for li in dom.select(&list_selector) {
+            // 统一调用 from_element
+            let content = Arc::new(CourseContentData::from_announcement_element(li)?);
+            announcements.push(CourseAnnouncementHandle {
+                client: self.client.clone(),
+                course: self.meta.clone(),
+                content,
+            });
+        }
 
-    //         // 2) 若有 folder 再找/建 Folder
-    //         let parent = if let Some(f) = folder {
-    //             if let Some(node) = entry_node
-    //                 .children
-    //                 .iter_mut()
-    //                 .find(|n| matches!(n.kind, NodeKind::Folder) && n.title == f)
-    //             {
-    //                 node
-    //             } else {
-    //                 entry_node.add_child(CourseTreeNode::new(
-    //                     f.to_string(),
-    //                     f.to_string(),
-    //                     NodeKind::Folder,
-    //                 ))
-    //             }
-    //         } else {
-    //             entry_node
-    //         };
-
-    //         // 3) 真正叶子
-    //         parent.add_child(CourseTreeNode::new(id, title, kind));
-    //     };
-
-    //     // 3. 文档
-    //     let (docs, _, _) = self.list_documents_with_hierarchy().await?;
-    //     for h in docs {
-    //         insert_leaf(
-    //             &h.content.section_name,           // ← Entry 名
-    //             h.content.parent_title.as_deref(), // ← Folder
-    //             h.id(),
-    //             h.title().to_string(),
-    //             NodeKind::Document,
-    //         );
-    //     }
-
-    //     // 4. 作业
-    //     for h in self.list_assignments_with_hierarchy().await? {
-    //         insert_leaf(
-    //             &h.content.section_name,
-    //             h.content.parent_title.as_deref(),
-    //             h.id(),
-    //             h.title().to_string(),
-    //             NodeKind::Assignment,
-    //         );
-    //     }
-
-    //     // 5. 视频
-    //     for h in self.get_video_list().await? {
-    //         insert_leaf(
-    //             &h.content.section_name,
-    //             h.content.parent_title.as_deref(),
-    //             h.id(),
-    //             h.title().to_string(),
-    //             NodeKind::Video,
-    //         );
-    //     }
-
-    //     // 6. 公告
-    //     for h in self.list_announcements().await? {
-    //         insert_leaf(
-    //             &h.content.section_name,
-    //             None,
-    //             h.id().to_string(),
-    //             h.title().to_string(),
-    //             NodeKind::Announcement,
-    //         );
-    //     }
-
-    //     Ok(root)
-    // }
+        Ok(announcements)
+    }
     pub async fn build_tree(&self) -> anyhow::Result<CourseTreeNode> {
         // 1. 创建根节点 - 课程本身
         let mut root = CourseTreeNode::new(
@@ -741,58 +598,50 @@ impl Course {
             root.children.push(entry_node);
         }
         // 插入资源的辅助函数
-        let mut insert_resource = |section_name: Option<&str>,
-                                  parent_title: Option<&str>,
-                                  id: String,
-                                  title: String,
-                                  kind: NodeKind,
-                                  content_handle: Option<ContentHandle>| {
-            // 确定父节点 - 优先使用 section_name
-            let parent_key = section_name
-                .or(parent_title)
-                .map(|s| s.to_string());
-            
-            if let Some(parent_key) = parent_key {
-                // 尝试找到匹配的入口节点
-                if let Some(&entry_idx) = entry_map.get(&parent_key) {
-                    // 添加到入口节点下
-                    let entry = &mut root.children[entry_idx];
-                    entry.children.push(CourseTreeNode::new(
-                        id,
-                        title,
-                        kind,
-                        content_handle,
-                    ));
+        let mut insert_resource =
+            |section_name: Option<&str>,
+             parent_title: Option<&str>,
+             id: String,
+             title: String,
+             kind: NodeKind,
+             content_handle: Option<ContentHandle>| {
+                // 确定父节点 - 优先使用 section_name
+                let parent_key = section_name.or(parent_title).map(|s| s.to_string());
+
+                if let Some(parent_key) = parent_key {
+                    // 尝试找到匹配的入口节点
+                    if let Some(&entry_idx) = entry_map.get(&parent_key) {
+                        // 添加到入口节点下
+                        let entry = &mut root.children[entry_idx];
+                        entry
+                            .children
+                            .push(CourseTreeNode::new(id, title, kind, content_handle));
+                    } else {
+                        // 没有匹配的入口节点，创建新文件夹
+                        let mut folder_node = CourseTreeNode::new(
+                            format!("folder-{}", parent_key),
+                            parent_key.clone(),
+                            NodeKind::Folder,
+                            None,
+                        );
+
+                        // 添加资源到文件夹
+                        folder_node.children.push(CourseTreeNode::new(
+                            id,
+                            title,
+                            kind,
+                            content_handle,
+                        ));
+
+                        // 添加文件夹到根节点
+                        root.children.push(folder_node);
+                    }
                 } else {
-                    // 没有匹配的入口节点，创建新文件夹
-                    let mut folder_node = CourseTreeNode::new(
-                        format!("folder-{}", parent_key),
-                        parent_key.clone(),
-                        NodeKind::Folder,
-                        None,
-                    );
-                    
-                    // 添加资源到文件夹
-                    folder_node.children.push(CourseTreeNode::new(
-                        id,
-                        title,
-                        kind,
-                        content_handle,
-                    ));
-                    
-                    // 添加文件夹到根节点
-                    root.children.push(folder_node);
+                    // 没有父信息，直接添加到根节点
+                    root.children
+                        .push(CourseTreeNode::new(id, title, kind, content_handle));
                 }
-            } else {
-                // 没有父信息，直接添加到根节点
-                root.children.push(CourseTreeNode::new(
-                    id,
-                    title,
-                    kind,
-                    content_handle,
-                ));
-            }
-        };
+            };
         // 3. 添加文档
         let (docs, _, _) = self.list_documents_with_hierarchy().await?;
         for h in docs {
@@ -831,13 +680,14 @@ impl Course {
         for h in self.list_announcements().await? {
             insert_resource(
                 h.content.section_name.as_deref(),
-                None,
+                h.content.parent_title.as_deref(),
                 h.id().to_string(),
-                h.title().to_string(),
+                h.content.title.clone(),
                 NodeKind::Announcement,
                 Some(ContentHandle::Announcement(h.clone())),
             );
         }
+
         Ok(root)
     }
 }
@@ -1108,46 +958,6 @@ impl CourseContentData {
                 Ok((text, href))
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
-
-        // ── ⑥ (B) 额外把 <img src=...> 也当作附件 ──────────────
-        for (idx, img) in detail_div
-            .select(&Selector::parse("img").unwrap())
-            .enumerate()
-        {
-            if let Some(src) = img.value().attr("src") {
-                // 1. 路径过滤：仍然要求 /bbcswebdav/
-                if !src.starts_with("/bbcswebdav/") {
-                    continue;
-                }
-
-                // 2. 扩展名黑名单
-                let ext = src.rsplit_once('.').map(|(_, e)| e.to_ascii_lowercase());
-                if matches!(ext.as_deref(), Some("gif" | "svg" | "ico")) {
-                    continue;
-                }
-
-                // 3. 生成文件名
-                let fname = Url::parse(&format!("https://dummy{src}"))
-                    .ok()
-                    .and_then(|u| {
-                        u.path_segments()
-                            .and_then(|seg| seg.last())
-                            .map(|s| s.to_string())
-                    })
-                    .filter(|s| !s.is_empty())
-                    .map(|s| {
-                        if s.contains('.') {
-                            s
-                        } else {
-                            format!("{s}.bin")
-                        }
-                    })
-                    .unwrap_or_else(|| format!("embed_img_{idx}.bin"));
-
-                attachments.push((fname, src.to_string()));
-            }
-        }
-
         Ok(Self {
             id,
             title,
@@ -1184,6 +994,90 @@ impl CourseContentData {
         }
 
         buffer
+    }
+    pub fn from_announcement_element(el: ElementRef) -> anyhow::Result<CourseContentData> {
+        anyhow::ensure!(el.value().name() == "li", "not a li element");
+
+        let id = el
+            .value()
+            .attr("id")
+            .context("content_id not found")?
+            .to_string();
+
+        let html_str = el.inner_html();
+        let fragment = Html::parse_fragment(&html_str);
+
+        // 标题：<h3 class="item">...</h3>
+        let title_selector = Selector::parse("h3.item").unwrap();
+        let title = fragment
+            .select(&title_selector)
+            .next()
+            .map(|el| el.text().collect::<String>().trim().to_string())
+            .unwrap_or_else(|| "(无标题)".to_string());
+
+        // 正文：<div class="vtbegenerated">...</div>
+        let content_selector = Selector::parse("div.vtbegenerated").unwrap();
+        let content_node = fragment.select(&content_selector).next();
+
+        // Descriptions：提取纯文本段落
+        let mut descriptions = content_node
+            .iter()
+            .flat_map(|div| div.text())
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<_>>();
+
+        // ✅ 插入发布者和发布时间信息
+        let creator_selector = Selector::parse("p span.creator").unwrap();
+        let time_selector = Selector::parse("p span:not(.creator)").unwrap();
+
+        let creator = fragment
+            .select(&creator_selector)
+            .next()
+            .map(|el| el.text().collect::<String>().trim().to_string())
+            .unwrap_or_else(|| "(未知发布者)".to_string());
+
+        let created_time = fragment
+            .select(&time_selector)
+            .next()
+            .map(|el| el.text().collect::<String>().trim().to_string())
+            .unwrap_or_else(|| "(未知时间)".to_string());
+
+        descriptions.insert(0, format!("{}", created_time));
+        descriptions.insert(0, format!("{}", creator));
+
+        // 附件：img 标签
+        let img_selector = Selector::parse("img").unwrap();
+        let attachments: Vec<(String, String)> = content_node
+            .into_iter()
+            .flat_map(|div| div.select(&img_selector))
+            .filter_map(|img| img.value().attr("src"))
+            .map(|src| {
+                // 提取文件名
+                let mut name = src.split('/').last().unwrap_or("unknown").to_string();
+
+                // 如果没有扩展名，则默认加上 `.jpg`
+                if !name.contains('.') {
+                    name.push_str(".jpg");
+                }
+
+                (name, src.to_string())
+            })
+            .collect();
+
+        Ok(CourseContentData {
+            id,
+            title,
+            kind: CourseContentKind::Announcement,
+            has_link: false,
+            descriptions,
+            attachments,
+            parent_id: None,
+            parent_title: None,
+            depth: 0,
+            section_name: Some("课程通知".to_string()),
+            is_folder: false,
+        })
     }
 }
 
@@ -1626,74 +1520,93 @@ impl CourseDocument {
     }
 }
 
-/* ━━━━━━━━━ CourseAnnouncement(Handle) ━━━━━━━━━ */
-
-#[derive(Debug, Clone)]
-pub struct CourseAnnouncementMeta {
-    id: String, // 可用 href 中 annId 或时间戳做稳定 id
-    time: String,
-    title: String,
-    href: String,
-}
-
 #[derive(Debug, Clone)]
 pub struct CourseAnnouncementHandle {
-    pub content: CourseContentData,
-    client: Client,
-    course: Arc<CourseMeta>,
-    meta: Arc<CourseAnnouncementMeta>,
+    pub client: Client,
+    pub course: Arc<CourseMeta>,
+    pub content: Arc<CourseContentData>,
 }
-
 impl CourseAnnouncementHandle {
-    pub fn id(&self) -> &str {
-        &self.meta.id
-    }
-    pub fn title(&self) -> &str {
-        &self.meta.title
-    }
-    pub fn time(&self) -> &str {
-        &self.meta.time
+    pub fn id(&self) -> String {
+        self.content.id.clone()
     }
 
-    pub async fn get(&self) -> anyhow::Result<CourseAnnouncement> {
-        // 真正请求正文页
-        let dom = self
-            .client
-            .get_by_uri(&self.meta.href)
-            .await?
-            .text()
-            .await?;
-        // …解析正文、图片、附件…
+    pub fn title(&self) -> String {
+        self.content.title.clone()
+    }
+    pub async fn get(&self) -> Result<CourseAnnouncement> {
         Ok(CourseAnnouncement {
             client: self.client.clone(),
             course: self.course.clone(),
-            meta: self.meta.clone(),
-            html: dom.into(),
+            content: self.content.clone(),
         })
     }
 }
-
 #[derive(Debug, Clone)]
 pub struct CourseAnnouncement {
-    client: Client,
-    course: Arc<CourseMeta>,
-    meta: Arc<CourseAnnouncementMeta>,
-    html: String, // ↓ 可延迟解析
+    pub client: Client,
+    pub course: Arc<CourseMeta>,
+    pub content: Arc<CourseContentData>,
 }
 impl CourseAnnouncement {
-    /// 原始 HTML 字符串（只读）
-    pub fn html_raw(&self) -> &str {
-        &self.html
+    pub fn title(&self) -> String {
+        self.content.title.clone()
+    }
+
+    pub fn descriptions(&self) -> &Vec<String> {
+        &self.content.descriptions
+    }
+
+    pub fn attachments(&self) -> &Vec<(String, String)> {
+        &self.content.attachments
+    }
+    /// 下载图片附件（带重定向处理）
+    pub async fn download_attachment(&self, uri: &str, dest: &std::path::Path) -> Result<()> {
+        log::debug!(
+            "downloading attachment from https://course.pku.edu.cn{}",
+            uri
+        );
+
+        let res = self.client.get_by_uri(uri).await?;
+        match res.status().as_u16() {
+            302 => {
+                let loc = res
+                    .headers()
+                    .get("location")
+                    .context("location header not found")?
+                    .to_str()
+                    .context("location header not str")?
+                    .to_owned();
+
+                log::debug!("redirected to https://course.pku.edu.cn{}", loc);
+
+                let res2 = self.client.get_by_uri(&loc).await?;
+                anyhow::ensure!(res2.status().is_success(), "status not success");
+
+                let body = res2.bytes().await?;
+                let r = compio::fs::write(dest, body).await;
+                compio::buf::buf_try!(@try r);
+            }
+
+            200 => {
+                let body = res.bytes().await?;
+                let r = compio::fs::write(dest, body).await;
+                compio::buf::buf_try!(@try r);
+            }
+
+            other => anyhow::bail!("unexpected status {}", other),
+        }
+
+        log::debug!("✅ attachment saved -> {}", dest.display());
+        Ok(())
     }
 }
-
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct CourseVideoMeta {
     title: String,
     time: String,
     url: String,
 }
-
 impl CourseVideoMeta {
     pub fn title(&self) -> &str {
         &self.title
