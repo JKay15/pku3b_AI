@@ -2,18 +2,18 @@
 //!
 //! 目前只是数据结构 + 若干辅助方法，真正的构建逻辑后续补上。
 use super::{
-    CourseAssignmentHandle, CourseDocumentHandle, CourseVideoHandle, CourseAnnouncementHandle
+    CourseAnnouncementHandle, CourseAssignmentHandle, CourseDocumentHandle, CourseVideoHandle,
 };
 /// 结点类型 —— 后续可扩充
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NodeKind {
-    Course,     // 课程根结点
-    Entry,       // 左侧导航条
-    Folder,      // Blackboard 文件夹
-    Document,    // 课件 / 通知等
-    Assignment,  // 作业
-    Video,       // 回放
-    Announcement // 课程公告
+    Course,       // 课程根结点
+    Entry,        // 左侧导航条
+    Folder,       // Blackboard 文件夹
+    Document,     // 课件 / 通知等
+    Assignment,   // 作业
+    Video,        // 回放
+    Announcement, // 课程公告
 }
 
 // 新增枚举，表示不同类型的内容句柄
@@ -28,25 +28,35 @@ pub enum ContentHandle {
 /// 一棵树里的一个节点
 #[derive(Debug, Clone)]
 pub struct CourseTreeNode {
-    pub id: String,          // 稳定 ID（课程内唯一）
-    pub title: String,       // 展示标题
-    pub kind: NodeKind,      // 结点类型
+    pub id: String,     // 稳定 ID（课程内唯一）
+    pub title: String,  // 展示标题
+    pub kind: NodeKind, // 结点类型
     pub content_handle: Option<ContentHandle>,
     pub children: Vec<CourseTreeNode>,
 }
 
 impl CourseTreeNode {
-    pub fn id(&self) -> &str      { &self.id }
-    pub fn title(&self) -> &str   { &self.title }
-    pub fn kind(&self) -> NodeKind { self.kind }
-    pub fn children(&self) -> &[CourseTreeNode] { &self.children }
-    pub fn children_mut(&mut self) -> &mut [CourseTreeNode] { &mut self.children }
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+    pub fn title(&self) -> &str {
+        &self.title
+    }
+    pub fn kind(&self) -> NodeKind {
+        self.kind
+    }
+    pub fn children(&self) -> &[CourseTreeNode] {
+        &self.children
+    }
+    pub fn children_mut(&mut self) -> &mut [CourseTreeNode] {
+        &mut self.children
+    }
     /// 创建空节点（仅 root / placeholder 用）
     pub fn new(
         id: impl Into<String>,
         title: impl Into<String>,
         kind: NodeKind,
-        content_handle: Option<ContentHandle> // 新增参数
+        content_handle: Option<ContentHandle>, // 新增参数
     ) -> Self {
         Self {
             id: id.into(),
@@ -80,7 +90,7 @@ impl CourseTreeNode {
             _ => None,
         }
     }
-    
+
     // 新增方法：获取公告句柄
     pub fn as_announcement(&self) -> Option<&CourseAnnouncementHandle> {
         match &self.content_handle {
@@ -129,5 +139,4 @@ impl CourseTreeNode {
             }
         })
     }
-
 }
