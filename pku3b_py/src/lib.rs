@@ -1,6 +1,5 @@
 //! pku3b_py – 2025-06 重构版
 use pyo3::prelude::*;
-use pyo3::types::PyBytes;
 use std::{cell::RefCell, collections::HashMap, path::PathBuf};
 use std::{fs, path::Path}; // ← 把 io::Write 补进来
 
@@ -9,13 +8,13 @@ use compio::runtime::Runtime;
 use pku3b::api::{
     Blackboard, Client, ContentHandle, Course, CourseAnnouncement, CourseAnnouncementHandle,
     CourseAssignment, CourseAssignmentHandle, CourseDocument, CourseDocumentHandle, CourseHandle,
-    CourseTreeNode, CourseVideo, CourseVideoHandle, NodeKind,
+    CourseTreeNode, CourseVideo, CourseVideoHandle,
 };
 use pku3b::utils;
 
 // ───────────── ① 每线程唯一的 Compio Runtime ─────────────
 thread_local! {
-    static LOCAL_RT: RefCell<Option<Runtime>> = RefCell::new(None);
+    static LOCAL_RT: RefCell<Option<Runtime>> = const { RefCell::new(None) };
 }
 /// 在当前线程取出（或创建）Runtime，并在其中执行闭包
 fn with_rt<F, R>(f: F) -> R
@@ -169,7 +168,7 @@ impl PyCourse {
 
         let mut py_handles = Vec::new();
         for handle in handles {
-            py_handles.push(PyAnnouncementHandle { handle: handle });
+            py_handles.push(PyAnnouncementHandle { handle });
         }
 
         Ok(py_handles)
