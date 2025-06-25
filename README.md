@@ -6,7 +6,6 @@
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/XiongJkay/pku3b_AI/build-release.yml)
 ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/XiongJkay/pku3b_AI/total)
 
-> **AI 赋能教学网信息管理，从爬虫到认知代理的全面革新。**
 
 ---
 
