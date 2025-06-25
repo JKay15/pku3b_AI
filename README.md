@@ -1,7 +1,7 @@
 # 🧠 pku3b_AI：全球最强的北大教学网智能爬虫系统
 
 [![Crates.io](https://img.shields.io/crates/v/pku3b)](https://crates.io/crates/pku3b)
-![Issues](https://img.shields.io/github/issues-search?query=repo%3AXiongJkay%2Fpku3b_AI%20is%3Aopen&label=issues&color=orange)
+![Issues]([https://img.shields.io/github/issues-search?query=repo%3AXiongJkay%2Fpku3b_AI%20is%3Aopen&label=issues&color=orange](https://github.com/JKay15/pku3b_AI/issues))
 ![Closed Issues](https://img.shields.io/github/issues-search?query=repo%3AXiongJkay%2Fpku3b_AI%20is%3Aclosed&label=closed%20issues&color=green)
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/XiongJkay/pku3b_AI/build-release.yml)
 ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/XiongJkay/pku3b_AI/total)
