@@ -1,14 +1,15 @@
 //! pku3b_py – 2025-06 重构版
 use pyo3::prelude::*;
+use pyo3::types::PyBytes;
 use std::{cell::RefCell, collections::HashMap, path::PathBuf};
 use std::{fs, path::Path}; // ← 把 io::Write 补进来
 
 use anyhow::Error;
 use compio::runtime::Runtime;
 use pku3b::api::{
-    Blackboard, Client, Course, CourseAnnouncement, CourseAnnouncementHandle, CourseAssignment,
-    CourseAssignmentHandle, CourseDocument, CourseDocumentHandle, CourseHandle, CourseVideo,
-    CourseVideoHandle,CourseTreeNode, NodeKind,ContentHandle,
+    Blackboard, Client, ContentHandle, Course, CourseAnnouncement, CourseAnnouncementHandle,
+    CourseAssignment, CourseAssignmentHandle, CourseDocument, CourseDocumentHandle, CourseHandle,
+    CourseTreeNode, CourseVideo, CourseVideoHandle, NodeKind,
 };
 use pku3b::utils;
 
@@ -162,11 +163,16 @@ impl PyCourse {
             .collect())
     }
     /*—— 公告 ——*/
-    fn list_announcements(&self) -> PyResult<Vec<PyAnnouncementHandle>> {
-        let v = with_rt(|rt| rt.block_on(self.inner.list_announcements())).map_err(anyhow_to_py)?;
-        Ok(v.into_iter()
-            .map(|h| PyAnnouncementHandle { inner: h })
-            .collect())
+    pub fn list_announcements(&self) -> PyResult<Vec<PyAnnouncementHandle>> {
+        let handles =
+            with_rt(|rt| rt.block_on(self.inner.list_announcements())).map_err(anyhow_to_py)?;
+
+        let mut py_handles = Vec::new();
+        for handle in handles {
+            py_handles.push(PyAnnouncementHandle { handle: handle });
+        }
+
+        Ok(py_handles)
     }
     /*—— 作业（带层级信息） ——*/
     fn list_assignments(&self) -> PyResult<Vec<PyAssignmentHandle>> {
@@ -191,8 +197,7 @@ impl PyCourse {
     }
     /// 构建整棵课程内容树并返回根节点
     fn build_tree(&self) -> PyResult<PyCourseTreeNode> {
-        let root = with_rt(|rt| rt.block_on(self.inner.build_tree()))
-            .map_err(anyhow_to_py)?;
+        let root = with_rt(|rt| rt.block_on(self.inner.build_tree())).map_err(anyhow_to_py)?;
 
         Ok(PyCourseTreeNode { inner: root })
     }
@@ -523,47 +528,85 @@ impl PyDocument {
         Ok(())
     }
 }
-
 #[pyclass]
+#[derive(Clone)]
 pub struct PyAnnouncementHandle {
-    inner: CourseAnnouncementHandle,
+    pub handle: CourseAnnouncementHandle,
 }
+
 #[pymethods]
 impl PyAnnouncementHandle {
     #[getter]
     fn id(&self) -> String {
-        self.inner.id().to_string()
-    }
-
-    #[getter]
-    fn time(&self) -> String {
-        self.inner.time().to_string()
+        self.handle.id()
     }
 
     #[getter]
     fn title(&self) -> String {
-        self.inner.title().to_string()
+        self.handle.title().to_string()
     }
+
+    #[getter]
+    fn parent_title(&self) -> Option<String> {
+        self.handle.content.parent_title.clone()
+    }
+
+    #[getter]
+    fn section_name(&self) -> Option<String> {
+        self.handle.content.section_name.clone()
+    }
+
     fn get(&self) -> PyResult<PyAnnouncement> {
-        Ok(PyAnnouncement {
-            inner: with_rt(|rt| rt.block_on(self.inner.get())).map_err(anyhow_to_py)?,
-        })
+        let a = with_rt(|rt| rt.block_on(self.handle.clone().get())).map_err(anyhow_to_py)?;
+        Ok(PyAnnouncement { inner: a })
     }
 }
 #[pyclass]
 pub struct PyAnnouncement {
-    inner: CourseAnnouncement,
-}
-#[pymethods]
-impl PyAnnouncement {
-    /// 获取通知原始 HTML
-    #[pyo3(name = "html")]
-    fn html(&self) -> String {
-        self.inner.html_raw().to_string()
-    }
-    // TODO: 提供 markdown/plaintext 渲染、附件下载等
+    pub inner: CourseAnnouncement,
 }
 
+#[pymethods]
+impl PyAnnouncement {
+    #[getter]
+    fn title(&self) -> String {
+        self.inner.title().to_string()
+    }
+
+    #[getter]
+    fn descriptions(&self) -> Vec<String> {
+        self.inner.descriptions().to_vec()
+    }
+
+    #[getter]
+    fn parent_title(&self) -> Option<String> {
+        self.inner.content.parent_title.clone()
+    }
+
+    #[getter]
+    fn section_name(&self) -> Option<String> {
+        self.inner.content.section_name.clone()
+    }
+
+    #[getter]
+    fn attachments(&self) -> Vec<(String, String)> {
+        self.inner.attachments().to_vec()
+    }
+
+    fn download(&self, dst: String) -> PyResult<()> {
+        let dst = PathBuf::from(dst);
+        std::fs::create_dir_all(&dst).ok();
+        for (name, uri) in self.inner.attachments() {
+            with_rt(|rt| rt.block_on(self.inner.download_attachment(uri, &dst.join(name))))
+                .map_err(anyhow_to_py)?;
+        }
+        Ok(())
+    }
+
+    fn __repr__(&self) -> String {
+        format!("<Announcement {}>", self.inner.title())
+    }
+}
 // ========== 末尾放在其他类之后 ==========
 #[pyclass]
 pub struct PyCourseTreeNode {
@@ -572,9 +615,18 @@ pub struct PyCourseTreeNode {
 
 #[pymethods]
 impl PyCourseTreeNode {
-    #[getter] fn id(&self) -> String   { self.inner.id().to_string() }
-    #[getter] fn title(&self) -> String{ self.inner.title().to_string() }
-    #[getter] fn kind(&self) -> String { format!("{:?}", self.inner.kind()) }
+    #[getter]
+    fn id(&self) -> String {
+        self.inner.id().to_string()
+    }
+    #[getter]
+    fn title(&self) -> String {
+        self.inner.title().to_string()
+    }
+    #[getter]
+    fn kind(&self) -> String {
+        format!("{:?}", self.inner.kind())
+    }
 
     /// 子节点列表
     #[getter]
@@ -590,68 +642,83 @@ impl PyCourseTreeNode {
     /// 获取文档句柄（如果节点是文档类型）
     fn get_document_handle(&self) -> Option<PyDocumentHandle> {
         if let Some(ContentHandle::Document(handle)) = &self.inner.content_handle {
-            Some(PyDocumentHandle { handle: handle.clone() })
+            Some(PyDocumentHandle {
+                handle: handle.clone(),
+            })
         } else {
-            None        
+            None
         }
     }
-    
+
     /// 获取作业句柄（如果节点是作业类型）
     fn get_assignment_handle(&self) -> Option<PyAssignmentHandle> {
         if let Some(ContentHandle::Assignment(handle)) = &self.inner.content_handle {
-            Some(PyAssignmentHandle { handle: handle.clone() })
+            Some(PyAssignmentHandle {
+                handle: handle.clone(),
+            })
         } else {
-            None        }
+            None
+        }
     }
-    
+
     /// 获取视频句柄（如果节点是视频类型）
     fn get_video_handle(&self) -> Option<PyVideoHandle> {
         if let Some(ContentHandle::Video(handle)) = &self.inner.content_handle {
-            Some(PyVideoHandle { handle: handle.clone() })
+            Some(PyVideoHandle {
+                handle: handle.clone(),
+            })
         } else {
-            None        }
+            None
+        }
     }
-    
+
     /// 获取公告句柄（如果节点是公告类型）
     fn get_announcement_handle(&self) -> Option<PyAnnouncementHandle> {
         if let Some(ContentHandle::Announcement(handle)) = &self.inner.content_handle {
-            Some(PyAnnouncementHandle { inner: handle.clone() })
+            Some(PyAnnouncementHandle {
+                handle: handle.clone(),
+            })
         } else {
-            None        }
+            None
+        }
     }
-    
+
     /// 递归查找节点（根据标题或ID）
     fn find(&self, query: &str) -> Option<PyCourseTreeNode> {
         // 检查当前节点是否匹配
         if self.id() == query || self.title() == query {
-            return Some(PyCourseTreeNode { inner: self.inner.clone() });
+            return Some(PyCourseTreeNode {
+                inner: self.inner.clone(),
+            });
         }
-        
+
         // 递归检查子节点
         for child in self.children() {
             if let Some(found) = child.find(query) {
                 return Some(found);
             }
         }
-        
+
         None
     }
-    
+
     /// 按类型查找节点
     fn find_by_kind(&self, kind: &str) -> Vec<PyCourseTreeNode> {
         let mut results = Vec::new();
         let current_kind = self.kind();
-        
+
         // 检查当前节点是否匹配
         if current_kind == kind {
-            results.push(PyCourseTreeNode { inner: self.inner.clone() });
+            results.push(PyCourseTreeNode {
+                inner: self.inner.clone(),
+            });
         }
-        
+
         // 递归检查子节点
         for child in self.children() {
             results.extend(child.find_by_kind(kind));
         }
-        
+
         results
     }
 
