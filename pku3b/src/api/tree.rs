@@ -118,7 +118,7 @@ impl CourseTreeNode {
     }
 
     /// 广度优先遍历（可变）
-    pub fn bfs_mut<'a>(&'a mut self) -> impl Iterator<Item = &'a mut CourseTreeNode> {
+    pub fn bfs_mut(&mut self) -> impl Iterator<Item = &mut CourseTreeNode> {
         use std::collections::VecDeque;
 
         // 裸指针队列保证生命周期分离

@@ -16,6 +16,12 @@ pub struct MultipartBuilder<'a> {
     fields: Vec<FormField<'a>>,
 }
 
+impl<'a> Default for MultipartBuilder<'a> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<'a> MultipartBuilder<'a> {
     /// 创建一个新的 MultipartBuilder
     pub fn new() -> Self {

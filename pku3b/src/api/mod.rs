@@ -15,7 +15,6 @@ use itertools::Itertools;
 use scraper::ElementRef;
 use scraper::Html;
 use scraper::Selector;
-use std::pin::Pin;
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     hash::{Hash, Hasher},
@@ -234,7 +233,7 @@ impl CourseMeta {
         let i = s
             .char_indices()
             .filter(|(_, c)| *c == '(')
-            .last()
+            .next_back()
             .unwrap()
             .0;
         s.split_at(i).0.trim()
@@ -587,7 +586,7 @@ impl Course {
         );
         // 2. 创建入口节点 (Entry)
         let mut entry_map = HashMap::new();
-        for (title, _url) in self.entries() {
+        for title in self.entries().keys() {
             let entry_node = CourseTreeNode::new(
                 format!("entry-{}", title),
                 title.clone(),
@@ -834,7 +833,7 @@ impl CourseContentStream {
     pub fn get_children(&self, id: &str) -> Vec<&str> {
         self.parent_map
             .iter()
-            .filter(|(_, parent)| parent.as_ref().map_or(false, |p| p == id))
+            .filter(|(_, parent)| parent.as_ref().is_some_and(|p| p == id))
             .map(|(child, _)| child.as_str())
             .collect()
     }
@@ -946,7 +945,7 @@ impl CourseContentData {
             .collect::<Vec<_>>();
 
         // ── ⑤ (A) 原有 <a> 附件 ────────────────────────────────
-        let mut attachments = detail_div
+        let attachments = detail_div
             .select(&Selector::parse("ul.attachments > li > a").unwrap())
             .map(|a| {
                 let text = a
@@ -1043,8 +1042,8 @@ impl CourseContentData {
             .map(|el| el.text().collect::<String>().trim().to_string())
             .unwrap_or_else(|| "(未知时间)".to_string());
 
-        descriptions.insert(0, format!("{}", created_time));
-        descriptions.insert(0, format!("{}", creator));
+        descriptions.insert(0, created_time.to_string());
+        descriptions.insert(0, creator.to_string());
 
         // 附件：img 标签
         let img_selector = Selector::parse("img").unwrap();
@@ -1054,7 +1053,7 @@ impl CourseContentData {
             .filter_map(|img| img.value().attr("src"))
             .map(|src| {
                 // 提取文件名
-                let mut name = src.split('/').last().unwrap_or("unknown").to_string();
+                let mut name = src.split('/').next_back().unwrap_or("unknown").to_string();
 
                 // 如果没有扩展名，则默认加上 `.jpg`
                 if !name.contains('.') {
