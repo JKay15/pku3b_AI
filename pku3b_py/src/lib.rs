@@ -56,7 +56,6 @@ impl PyClient {
     }
 
     /// 返回当前平台下 pku3b 的缓存目录绝对路径
-    #[getter]
     fn cache_dir(&self) -> String {
         utils::projectdir()
             .cache_dir()
@@ -79,12 +78,10 @@ pub struct PyCourseHandle {
 
 #[pymethods]
 impl PyCourseHandle {
-    #[getter]
     fn title(&self) -> String {
         self.handle.title().to_string()
     }
 
-    #[getter]
     fn id(&self) -> String {
         self.handle.id().to_string()
     }
@@ -140,13 +137,11 @@ pub struct PyCourse {
 
 #[pymethods]
 impl PyCourse {
-    #[getter]
     fn title(&self) -> String {
         self.inner.meta().title().to_string()
     }
 
     /// 左侧菜单 HashMap<title, url>
-    #[getter]
     fn entries(&self) -> HashMap<String, String> {
         self.inner.entries().clone()
     }
@@ -255,22 +250,18 @@ pub struct PyAssignmentHandle {
 
 #[pymethods]
 impl PyAssignmentHandle {
-    #[getter]
     fn id(&self) -> String {
         self.handle.id()
     }
 
-    #[getter]
     fn title(&self) -> String {
         self.handle.title().to_string()
     }
 
-    #[getter]
     fn parent_title(&self) -> Option<String> {
         self.handle.content.parent_title.clone()
     }
 
-    #[getter]
     fn section_name(&self) -> Option<String> {
         self.handle.content.section_name.clone()
     }
@@ -305,26 +296,21 @@ pub struct PyAssignment {
 
 #[pymethods]
 impl PyAssignment {
-    #[getter]
     fn title(&self) -> String {
         self.inner.title().to_string()
     }
-    #[getter]
     fn attachments(&self) -> Vec<(String, String)> {
         self.inner.attachments().to_vec()
     }
 
-    #[getter]
     fn descriptions(&self) -> Vec<String> {
         self.inner.descriptions().to_vec()
     }
 
-    #[getter]
     fn parent_title(&self) -> Option<String> {
         self.parent_title.clone()
     }
 
-    #[getter]
     fn section_name(&self) -> Option<String> {
         self.section_name.clone()
     }
@@ -356,17 +342,14 @@ pub struct PyVideoHandle {
 
 #[pymethods]
 impl PyVideoHandle {
-    #[getter]
     fn id(&self) -> String {
         self.handle.id()
     }
 
-    #[getter]
     fn title(&self) -> String {
         self.handle.title().to_string()
     }
 
-    #[getter]
     fn time(&self) -> String {
         self.handle.time().to_string()
     }
@@ -387,15 +370,12 @@ pub struct PyVideo {
 
 #[pymethods]
 impl PyVideo {
-    #[getter]
     fn course(&self) -> String {
         self.inner.course_name().to_string()
     }
-    #[getter]
     fn title(&self) -> String {
         self.inner.meta().title().to_string()
     }
-    #[getter]
     fn len(&self) -> usize {
         self.inner.len_segments()
     }
@@ -517,22 +497,18 @@ pub struct PyDocumentHandle {
 
 #[pymethods]
 impl PyDocumentHandle {
-    #[getter]
     fn id(&self) -> String {
         self.handle.id()
     }
 
-    #[getter]
     fn title(&self) -> String {
         self.handle.title().to_string()
     }
 
-    #[getter]
     fn parent_title(&self) -> Option<String> {
         self.handle.content.parent_title.clone()
     }
 
-    #[getter]
     fn section_name(&self) -> Option<String> {
         self.handle.content.section_name.clone()
     }
@@ -558,24 +534,18 @@ pub struct PyDocument {
 
 #[pymethods]
 impl PyDocument {
-    #[getter]
     fn title(&self) -> String {
         self.inner.title().to_string()
     }
-    #[getter]
     fn descriptions(&self) -> Vec<String> {
         self.inner.descriptions().to_vec()
     }
-    #[getter]
     fn parent_title(&self) -> Option<String> {
         self.inner.content.parent_title.clone()
     }
-
-    #[getter]
     fn section_name(&self) -> Option<String> {
         self.inner.content.section_name.clone()
     }
-    #[getter]
     fn attachments(&self) -> Vec<(String, String)> {
         self.inner.attachments().to_vec()
     }
@@ -599,22 +569,18 @@ pub struct PyAnnouncementHandle {
 
 #[pymethods]
 impl PyAnnouncementHandle {
-    #[getter]
     fn id(&self) -> String {
         self.handle.id()
     }
 
-    #[getter]
     fn title(&self) -> String {
         self.handle.title().to_string()
     }
 
-    #[getter]
     fn parent_title(&self) -> Option<String> {
         self.handle.content.parent_title.clone()
     }
 
-    #[getter]
     fn section_name(&self) -> Option<String> {
         self.handle.content.section_name.clone()
     }
@@ -640,27 +606,22 @@ pub struct PyAnnouncement {
 
 #[pymethods]
 impl PyAnnouncement {
-    #[getter]
     fn title(&self) -> String {
         self.inner.title().to_string()
     }
 
-    #[getter]
     fn descriptions(&self) -> Vec<String> {
         self.inner.descriptions().to_vec()
     }
 
-    #[getter]
     fn parent_title(&self) -> Option<String> {
         self.inner.content.parent_title.clone()
     }
 
-    #[getter]
     fn section_name(&self) -> Option<String> {
         self.inner.content.section_name.clone()
     }
 
-    #[getter]
     fn attachments(&self) -> Vec<(String, String)> {
         self.inner.attachments().to_vec()
     }
@@ -687,21 +648,17 @@ pub struct PyCourseTreeNode {
 
 #[pymethods]
 impl PyCourseTreeNode {
-    #[getter]
     fn id(&self) -> String {
         self.inner.id().to_string()
     }
-    #[getter]
     fn title(&self) -> String {
         self.inner.title().to_string()
     }
-    #[getter]
     fn kind(&self) -> String {
         format!("{:?}", self.inner.kind())
     }
 
     /// 子节点列表
-    #[getter]
     fn children(&self) -> Vec<PyCourseTreeNode> {
         self.inner
             .children()
