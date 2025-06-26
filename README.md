@@ -196,6 +196,7 @@ pip install maturin
 
 # 构建 Python 接口
 maturin develop
+```
 
 ## 📘 使用文档
 
