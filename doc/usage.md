@@ -64,6 +64,8 @@ course = courses[0].get()  # 或 bb.course(0)
 ### 作业模块
 
 - `list_assignments()` / `find_assignments_by_title(query)`
+- `list_unsubmitted_assignments()`：列出所有未提交的作业
+- `list_submitted_assignments()`：列出所有已提交的作业
 - `PyAssignmentHandle.get()` → `PyAssignment`
 - `submit_file(path)`：上传作业
 
