@@ -161,6 +161,13 @@ impl PyCourse {
             .map(|h| PyVideoHandle { handle: h })
             .collect())
     }
+    fn find_videos_by_title(&self, query: String) -> PyResult<Vec<PyVideoHandle>> {
+        Ok(self
+            .list_videos()?
+            .into_iter()
+            .filter(|h| h.title().contains(&query))
+            .collect())
+    }
     /*—— 公告 ——*/
     pub fn list_announcements(&self) -> PyResult<Vec<PyAnnouncementHandle>> {
         let handles =
@@ -173,6 +180,14 @@ impl PyCourse {
 
         Ok(py_handles)
     }
+
+    fn find_announcements_by_title(&self, query: String) -> PyResult<Vec<PyAnnouncementHandle>> {
+        Ok(self
+            .list_announcements()?
+            .into_iter()
+            .filter(|h| h.title().contains(&query))
+            .collect())
+    }
     /*—— 作业（带层级信息） ——*/
     fn list_assignments(&self) -> PyResult<Vec<PyAssignmentHandle>> {
         let handles = with_rt(|rt| rt.block_on(self.inner.list_assignments_with_hierarchy()))
@@ -181,6 +196,13 @@ impl PyCourse {
         Ok(handles
             .into_iter()
             .map(|h| PyAssignmentHandle { handle: h })
+            .collect())
+    }
+    fn find_assignments_by_title(&self, query: String) -> PyResult<Vec<PyAssignmentHandle>> {
+        Ok(self
+            .list_assignments()?
+            .into_iter()
+            .filter(|h| h.title().contains(&query))
             .collect())
     }
 
@@ -194,11 +216,34 @@ impl PyCourse {
             .map(|h| PyDocumentHandle { handle: h })
             .collect())
     }
+
+    fn find_documents_by_title(&self, query: String) -> PyResult<Vec<PyDocumentHandle>> {
+        Ok(self
+            .list_documents()?
+            .into_iter()
+            .filter(|h| h.title().contains(&query))
+            .collect())
+    }
     /// 构建整棵课程内容树并返回根节点
     fn build_tree(&self) -> PyResult<PyCourseTreeNode> {
         let root = with_rt(|rt| rt.block_on(self.inner.build_tree())).map_err(anyhow_to_py)?;
 
         Ok(PyCourseTreeNode { inner: root })
+    }
+    // ====== Entry 左侧菜单项 ======
+    fn list_entry_titles(&self) -> Vec<String> {
+        self.entries().keys().cloned().collect()
+    }
+
+    fn list_entry_pairs(&self) -> Vec<(String, String)> {
+        self.entries().into_iter().collect()
+    }
+
+    fn find_entries_by_title(&self, query: String) -> Vec<(String, String)> {
+        self.entries()
+            .into_iter()
+            .filter(|(k, _)| k.contains(&query))
+            .collect()
     }
 }
 /*━━━━━━━━━━━━━━━━━━━━━━ ⑤ PyAssignmentHandler ━━━━━━━━━━━━━━━━━━━━*/
@@ -239,6 +284,14 @@ impl PyAssignmentHandle {
             parent_title: self.handle.content.parent_title.clone(),
             section_name: self.handle.content.section_name.clone(),
         })
+    }
+    fn summary(&self) -> String {
+        format!(
+            "[{}] {} ({:?})",
+            self.id(),
+            self.title(),
+            self.section_name()
+        )
     }
 }
 /*━━━━━━━━━━━━━━━━━━━━━━ ⑤ PyAssignment ━━━━━━━━━━━━━━━━━━━━*/
@@ -321,6 +374,9 @@ impl PyVideoHandle {
     fn get(&self) -> PyResult<PyVideo> {
         let v = with_rt(|rt| rt.block_on(self.handle.get())).map_err(anyhow_to_py)?;
         Ok(PyVideo { inner: v })
+    }
+    fn summary(&self) -> String {
+        format!("[{}] {} ({})", self.id(), self.title(), self.time())
     }
 }
 /*━━━━━━━━━━━━━━━━━━━━━━━ ⑤ PyVideo ━━━━━━━━━━━━━━━━━━━━*/
@@ -484,6 +540,14 @@ impl PyDocumentHandle {
         let d = with_rt(|rt| rt.block_on(self.handle.clone().get())).map_err(anyhow_to_py)?;
         Ok(PyDocument { inner: d })
     }
+    fn summary(&self) -> String {
+        format!(
+            "[{}] {} ({:?})",
+            self.id(),
+            self.title(),
+            self.section_name()
+        )
+    }
 }
 
 /* ---------- PyDocument (正文 + 附件) ---------- */
@@ -558,6 +622,15 @@ impl PyAnnouncementHandle {
     fn get(&self) -> PyResult<PyAnnouncement> {
         let a = with_rt(|rt| rt.block_on(self.handle.clone().get())).map_err(anyhow_to_py)?;
         Ok(PyAnnouncement { inner: a })
+    }
+
+    fn summary(&self) -> String {
+        format!(
+            "[{}] {} ({:?})",
+            self.id(),
+            self.title(),
+            self.section_name()
+        )
     }
 }
 #[pyclass]
@@ -719,6 +792,36 @@ impl PyCourseTreeNode {
         }
 
         results
+    }
+
+    /// 以文本形式打印整棵子树
+    fn summary_tree(&self) -> String {
+        fn dfs(node: &PyCourseTreeNode, indent: &str, last: bool, out: &mut String) {
+            let icon = match node.kind().as_str() {
+                "Document" => "📄",
+                "Assignment" => "📝",
+                "Video" => "📺",
+                "Announcement" => "📢",
+                "Folder" => "📁",
+                _ => "📦",
+            };
+            let branch = if last { "└── " } else { "├── " };
+            out.push_str(&format!("{indent}{branch}{icon} {}\n", node.title()));
+
+            let next_indent = if last {
+                format!("{indent}    ")
+            } else {
+                format!("{indent}│   ")
+            };
+            let children = node.children();
+            for (i, child) in children.iter().enumerate() {
+                dfs(child, &next_indent, i == children.len() - 1, out);
+            }
+        }
+
+        let mut result = String::new();
+        dfs(self, "", true, &mut result);
+        result
     }
 
     fn __repr__(&self) -> String {
