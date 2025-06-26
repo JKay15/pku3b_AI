@@ -1,4 +1,4 @@
-# 🧠 pku3b_AI：全球最强的北大教学网智能爬虫系统
+# 🧠 PKU3b_AI: A Even Better Black Board for PKUers 🎓
 
 [![Crates.io](https://img.shields.io/crates/v/pku3b)](https://crates.io/crates/pku3b)
 ![Issues]([https://img.shields.io/github/issues-search?query=repo%3AXiongJkay%2Fpku3b_AI%20is%3Aopen&label=issues&color=orange](https://github.com/JKay15/pku3b_AI/issues))
