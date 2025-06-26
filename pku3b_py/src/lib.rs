@@ -200,6 +200,28 @@ impl PyCourse {
             .filter(|h| h.title().contains(&query))
             .collect())
     }
+    fn list_unsubmitted_assignments(&self) -> PyResult<Vec<PyAssignmentHandle>> {
+        Ok(self
+            .list_assignments()?
+            .into_iter()
+            .filter(|h| {
+                match with_rt(|rt| rt.block_on(h.handle.get())) {
+                    Ok(assignment) => assignment.last_attempt().is_none(),
+                    Err(_) => false, // 如果获取失败就不纳入
+                }
+            })
+            .collect())
+    }
+    fn list_submitted_assignments(&self) -> PyResult<Vec<PyAssignmentHandle>> {
+        Ok(self
+            .list_assignments()?
+            .into_iter()
+            .filter(|h| match with_rt(|rt| rt.block_on(h.handle.get())) {
+                Ok(assignment) => assignment.last_attempt().is_some(),
+                Err(_) => false,
+            })
+            .collect())
+    }
 
     /*—— 文档（带层级信息） ——*/
     fn list_documents(&self) -> PyResult<Vec<PyDocumentHandle>> {
@@ -296,6 +318,9 @@ pub struct PyAssignment {
 
 #[pymethods]
 impl PyAssignment {
+    pub fn is_submitted(&self) -> bool {
+        self.inner.last_attempt().is_some()
+    }
     fn title(&self) -> String {
         self.inner.title().to_string()
     }
