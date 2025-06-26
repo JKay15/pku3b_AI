@@ -1,0 +1,18 @@
+{
+  "name": "download_document",
+  "description": "下载指定课程中的某个文档资源，课程和文档标题都支持模糊匹配。",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "course": {
+        "type": "string",
+        "description": "课程名称，可使用模糊匹配方式"
+      },
+      "title": {
+        "type": "string",
+        "description": "文档标题，可使用模糊匹配方式"
+      }
+    },
+    "required": ["course", "title"]
+  }
+}

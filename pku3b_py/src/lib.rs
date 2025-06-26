@@ -262,6 +262,21 @@ impl PyCourse {
             .filter(|(k, _)| k.contains(&query))
             .collect()
     }
+    fn summary(&self) -> PyResult<String> {
+        // 构造结构化信息
+        let summary = serde_json::json!({
+            "title": self.inner.meta().title(),
+            "entries": self.inner.entries().iter().map(|(k, v)| {
+                serde_json::json!({
+                    "title": k,
+                    "url": v,
+                })
+            }).collect::<Vec<_>>(),
+        });
+
+        // 转为 JSON 字符串
+        Ok(summary.to_string())
+    }
 }
 /*━━━━━━━━━━━━━━━━━━━━━━ ⑤ PyAssignmentHandler ━━━━━━━━━━━━━━━━━━━━*/
 #[pyclass]

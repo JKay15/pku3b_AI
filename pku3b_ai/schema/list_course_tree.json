@@ -1,0 +1,14 @@
+{
+  "name": "list_course_tree",
+  "description": "展示指定课程的完整内容树，包括作业、文档、通知、视频等结构化子节点。",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "course": {
+        "type": "string",
+        "description": "课程名称，可模糊匹配"
+      }
+    },
+    "required": ["course"]
+  }
+}
