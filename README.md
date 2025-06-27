@@ -1,10 +1,10 @@
 # 🧠 PKU3b_AI: A Even Better Black Board for PKUers 🎓
 
 [![Crates.io](https://img.shields.io/crates/v/pku3b)](https://crates.io/crates/pku3b)
-![Issues]([https://img.shields.io/github/issues-search?query=repo%3AXiongJkay%2Fpku3b_AI%20is%3Aopen&label=issues&color=orange](https://github.com/JKay15/pku3b_AI/issues))
-![Closed Issues](https://img.shields.io/github/issues-search?query=repo%3AXiongJkay%2Fpku3b_AI%20is%3Aclosed&label=closed%20issues&color=green)
-![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/XiongJkay/pku3b_AI/build-release.yml)
-![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/XiongJkay/pku3b_AI/total)
+![Issues](https://img.shields.io/github/issues-search?query=repo%3AJKay15%2Fpku3b_AI%20is%3Aopen&label=issues&color=orange)
+![Closed Issues](https://img.shields.io/github/issues-search?query=repo%3AJKay15%2Fpku3b_AI%20is%3Aclosed&label=closed%20issues&color=green)
+![GitHub Actions Workflow Status](https://github.com/JKay15/pku3b_AI/blob/main/.github/workflows/ci.yml)
+![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/JKay15/pku3b_AI/total)
 
 
 ---
