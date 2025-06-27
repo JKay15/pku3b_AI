@@ -18,3 +18,7 @@ Cargo.lock          # 可选：若不想锁版本，可忽略；否则删这一�
 .idea/
 .vscode/
 EOF
+
+__pycache__/
+.pytest_cache/
+.mypy_cache/
