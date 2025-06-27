@@ -17,6 +17,8 @@
 | `pku3b`         | 后端爬虫核心，Fork 自 [sshwy/pku3b](https://github.com/sshwy/pku3b)，保留通信与下载核心机制。 |
 | `pku3b_py`      | Python 接口，基于 PyO3 封装，为 AI 系统提供统一访问入口。                      |
 
+![CleanShot 2025-06-27 at 22.28.00@2x.png](https://image-hosting-1319096909.cos.ap-beijing.myqcloud.com/CleanShot%202025-06-27%20at%2022.28.00%402x.png)
+
 ---
 
 ## 🚀 关键突破
