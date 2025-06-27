@@ -1,7 +1,7 @@
 from mcp.server.fastmcp import FastMCP
 from pku3b_py import PyClient, cache_size_gb, cache_clean
 from mcp.types import ToolAnnotations
-
+import os
 # 初始化 global 变量
 client = PyClient()
 # 从环境变量中获取账号密码
