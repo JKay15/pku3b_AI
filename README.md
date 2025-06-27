@@ -156,7 +156,7 @@ video = video_node.get_video_handle().get()
 video.download("./downloads/树状视频")
 ```
 
-
+---
 
 ## 💻 前端交互界面：Cherry Studio + MCP 接入
 
@@ -184,6 +184,17 @@ video.download("./downloads/树状视频")
 
 ---
 
+## 📘 使用文档
+
+本项目提供了完整、结构清晰的 Python 接口使用文档，详见：
+
+👉 [Python库pku3b_py使用说明文档（doc/usage.md）](doc/usage.md)
+
+👉 [MCP工具集说明文档（doc/mcp_tool_summary.md）](doc/mcp_tool_summary.md)
+
+
+---
+
 ## 🤝 致谢原项目
 
 本项目基于北大开源项目：
@@ -197,23 +208,4 @@ video.download("./downloads/树状视频")
 
 ---
 
-## 🔧 安装与构建（开发者模式）
 
-```bash
-# 安装 Rust 工具链
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
-# 安装 Python 构建依赖
-pip install maturin
-
-# 构建 Python 接口
-maturin develop
-```
-
-## 📘 使用文档
-
-本项目提供了完整、结构清晰的 Python 接口使用文档，详见：
-
-👉 [Python库pku3b_py使用说明文档（doc/usage.md）](doc/usage.md)
-
-👉 [MCP工具集说明文档（doc/mcp_tool_summary.md）](doc/mcp_tool_summary.md)
