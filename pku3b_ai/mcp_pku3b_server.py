@@ -4,7 +4,13 @@ from mcp.types import ToolAnnotations
 
 # 初始化 global 变量
 client = PyClient()
-bb = client.login_blackboard("", "")
+# 从环境变量中获取账号密码
+username = os.getenv("PKU_USERNAME")
+password = os.getenv("PKU_PASSWORD")
+if not username or not password:
+    raise RuntimeError("请设置 PKU_USERNAME 和 PKU_PASSWORD 环境变量")
+
+bb = client.login_blackboard(username, password)
 courses_handle = bb.list_courses()
 courses_real = [handle.get() for handle in courses_handle]
 assignment_registry = {}
