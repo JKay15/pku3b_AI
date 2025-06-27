@@ -4,7 +4,7 @@ from mcp.types import ToolAnnotations
 
 # 初始化 global 变量
 client = PyClient()
-bb = client.login_blackboard("2000012515", "20020210xjk")
+bb = client.login_blackboard("", "")
 courses_handle = bb.list_courses()
 courses_real = [handle.get() for handle in courses_handle]
 assignment_registry = {}
