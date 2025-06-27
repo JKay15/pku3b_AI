@@ -1,5 +1,5 @@
-from .tool_registry import tool_registry
-from .auth import load_or_login
+from ..tool_registry import tool_registry
+from ..auth import load_or_login
 from pydantic import BaseModel
 from typing import Any
 import json
