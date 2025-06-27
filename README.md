@@ -184,6 +184,58 @@ video.download("./downloads/树状视频")
 
 ---
 
+## 🔧 安装与构建（开发者模式）
+
+
+本系统支持从源码构建并部署完整交互功能，包括 Python 接口、MCP 工具注册服务和前端对话界面。请按如下步骤进行：
+
+
+### 1️⃣ 克隆项目
+
+```bash
+git clone https://github.com/JKay15/pku3b_AI.git
+cd pku3b_ai
+```
+
+### 2️⃣ 安装 Rust 与构建工具链
+
+```bash
+# 安装 Rust 工具链（首次安装）
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+# 重启终端后生效 rustc 和 cargo 命令
+```
+
+### 3️⃣ 安装 Python 依赖（包括构建器 maturin 和前端工具运行依赖）
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4️⃣ 构建 Python 模块（基于 maturin）
+
+```bash
+cd pku3b_py
+maturin develop  # 编译 Rust 模块并生成 Python 接口
+cd ..
+```
+
+### 5️⃣ 启动 MCP 工具服务
+
+```bash
+python pku3b_ai/mcp_pku3b_server.py
+```
+
+### 6️⃣ 启动 Cherry Studio 并配置 MCP Server
+
+在 Cherry Studio UI 中添加 MCP Server 设置，URL以运行mcp_pku3b_server.py后的终端输出为准：
+
+![CleanShot 2025-06-27 at 21.59.39@2x.png](https://image-hosting-1319096909.cos.ap-beijing.myqcloud.com/CleanShot%202025-06-27%20at%2021.59.39%402x.png)
+
+![CleanShot 2025-06-27 at 21.58.12@2x.png](https://image-hosting-1319096909.cos.ap-beijing.myqcloud.com/CleanShot%202025-06-27%20at%2021.58.12%402x.png)
+
+
+---
+
 ## 📘 使用文档
 
 本项目提供了完整、结构清晰的 Python 接口使用文档，详见：
