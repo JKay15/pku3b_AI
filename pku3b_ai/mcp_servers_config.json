@@ -1,9 +1,5 @@
 {
   "mcpServers": {
-    "fs": {
-      "command": "python",
-      "args": ["mcp_filesystem_server.py", "stdio"]
-    },
     "pku3b": {
       "command": "python",
       "args": ["mcp_pku3b_server.py", "stdio"]

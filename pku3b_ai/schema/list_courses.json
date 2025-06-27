@@ -1,9 +1,0 @@
-{
-  "name": "list_courses",
-  "description": "列出用户在教学网上注册的所有课程。",
-  "parameters": {
-    "type": "object",
-    "properties": {},
-    "required": []
-  }
-}

@@ -1,9 +1,0 @@
-{
-  "name": "list_unsubmitted_assignments",
-  "description": "列出当前学期所有尚未提交的作业，自动遍历所有课程。",
-  "parameters": {
-    "type": "object",
-    "properties": {},
-    "required": []
-  }
-}
