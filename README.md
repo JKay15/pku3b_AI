@@ -233,6 +233,10 @@ python pku3b_ai/mcp_pku3b_server.py
 
 ![CleanShot 2025-06-27 at 21.58.12@2x.png](https://image-hosting-1319096909.cos.ap-beijing.myqcloud.com/CleanShot%202025-06-27%20at%2021.58.12%402x.png)
 
+连接后即可使用自然语言对话调用系统功能（如下载作业、查看通知等）。
+
+![CleanShot 2025-06-27 at 22.01.33@2x.png](https://image-hosting-1319096909.cos.ap-beijing.myqcloud.com/CleanShot%202025-06-27%20at%2022.01.33%402x.png)
+
 
 ---
 
