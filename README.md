@@ -1,4 +1,4 @@
-# 🧠 PKU3b_AI: A Even Better Black Board for PKUers 🎓
+# 🧠 PKU3b_AI: An Even Better Blackboard for PKUers 🎓
 
 [![Crates.io](https://img.shields.io/crates/v/pku3b)](https://crates.io/crates/pku3b)
 ![Issues](https://img.shields.io/github/issues-search?query=repo%3AJKay15%2Fpku3b_AI%20is%3Aopen&label=issues&color=orange)
@@ -6,264 +6,260 @@
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/JKay15/pku3b_AI/build-release.yml)
 ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/JKay15/pku3b_AI/total)
 
+> [🇨🇳 **中文说明 (Chinese Version)**](README_zh.md)
 
 ---
 
-## 📦 项目结构概览
+## 📦 Project Structure Overview
 
-| 模块名称       | 说明                                                                 |
-|----------------|----------------------------------------------------------------------|
-| `pku3b_AI`      | 顶层项目，整合后端爬虫和智能封装，目标是打造北大教学网最强 AI 应用平台。        |
-| `pku3b`         | 后端爬虫核心，Fork 自 [sshwy/pku3b](https://github.com/sshwy/pku3b)，保留通信与下载核心机制。 |
-| `pku3b_py`      | Python 接口，基于 PyO3 封装，为 AI 系统提供统一访问入口。                      |
+| Module Name    | Description                                                                 |
+|----------------|-----------------------------------------------------------------------------|
+| `pku3b_AI`     | Top-level project integrating the backend scraper and intelligent encapsulation. Aiming to build the most powerful AI application platform for PKU Blackboard. |
+| `pku3b`        | Core backend scraper. Forked from [sshwy/pku3b](https://github.com/sshwy/pku3b), retaining core communication and download mechanisms. |
+| `pku3b_py`     | Python interface based on PyO3 encapsulation, providing a unified access point for AI systems. |
 
 ![CleanShot 2025-06-27 at 22.28.00@2x.png](https://image-hosting-1319096909.cos.ap-beijing.myqcloud.com/CleanShot%202025-06-27%20at%2022.28.00%402x.png)
 
 ---
 
-## 🚀 关键突破
+## 🚀 Key Breakthroughs
 
-| 功能模块        | 原版支持 | 我们的增强与创新                                             |
-|-----------------|----------|--------------------------------------------------------------|
-| 📋 作业系统        | ✅       | ✅ 保留原功能，增加结构化访问和句柄封装                         |
-| 🎥 视频下载        | ✅       | ✅ 保留断点续传/mp4 转码，适配 Python 下载 API                  |
-| 📄 文档系统        | ❌       | ✅ **新增：首次实现教学文档内容抓取 + 附件下载**                  |
-| 📢 通知系统        | ❌       | ✅ **新增：解析课程公告正文 + 图片附件，结构化呈现**              |
-| 🌲 内容树构建      | ❌       | ✅ **新增：课程结构树（文档/作业/通知/视频）统一封装，支持遍历和操作** |
-| 🧠 Python 封装接口 | ❌       | ✅ **新增：所有内容统一 `.get()` `.download()` `.descriptions()` 等接口** |
-| 🤖 AI 适配设计     | ❌       | ✅ **新增：面向 Agent/LLM 设计，适配自动总结、问答、任务管理场景**   |
-
----
-
-## 🛠️ 后端架构（`pku3b`）
-
-- 使用 Rust 高性能构建，模块职责清晰，性能极高。
-- 完整保留原项目的身份认证与通信逻辑。
-- 模块划分：
-  - `assignment`: 作业内容抓取与提交
-  - `video`: 回放列表与断点下载
-  - `document`: 课件文档模块（新增）
-  - `announcement`: 公告通知模块（新增）
-  - `tree`: 树状结构统一组织各类课程内容（新增）
-- 各类内容实现统一接口封装（id/title/正文/附件）
+| Module          | Original Support | Our Enhancements & Innovations                               |
+|-----------------|------------------|--------------------------------------------------------------|
+| 📋 Assignments  | ✅               | ✅ Retained functionality, added structured access and handle encapsulation. |
+| 🎥 Videos       | ✅               | ✅ Retained resumable downloads/MP4 conversion, adapted for Python Download API. |
+| 📄 Documents    | ❌               | ✅ **New: First implementation of document content scraping + attachment downloading.** |
+| 📢 Announcements| ❌               | ✅ **New: Parsing course announcement body + image attachments with structured presentation.** |
+| 🌲 Content Tree | ❌               | ✅ **New: Unified course structure tree (Docs/Assignments/Notices/Videos) supporting traversal and operations.** |
+| 🧠 Python API   | ❌               | ✅ **New: Unified `.get()`, `.download()`, `.descriptions()` interfaces for all content types.** |
+| 🤖 AI Adaptation| ❌               | ✅ **New: Designed for Agent/LLM scenarios, supporting auto-summarization, Q&A, and task management.** |
 
 ---
 
-## 🐍 Python 接口封装（`pku3b_py`）
+## 🛠️ Backend Architecture (`pku3b`)
 
-- 封装 Rust 接口为 Python 类：如 `CourseDocumentHandle`、`CourseAnnouncementHandle`
-- 所有内容统一封装成 `CourseContentData`，便于 AI 模型调用和脚本处理。
-- 每类内容支持：
-  - `.title()` / `.descriptions()` / `.download(path)` 方法
-  - 附件自动识别后缀并保存
+- Built with **Rust** for high performance and clear module responsibility.
+- Completely preserves the authentication and communication logic of the original project.
+- **Module Breakdown:**
+  - `assignment`: Assignment scraping and submission.
+  - `video`: Playback lists and resumable downloads.
+  - `document`: Courseware document module (New).
+  - `announcement`: Announcement module (New).
+  - `tree`: Tree structure for unified organization of course content (New).
+- Unified interface encapsulation for all content types (id/title/body/attachments).
 
 ---
 
-### 🧪 使用示例（Python）
+## 🐍 Python Interface (`pku3b_py`)
 
-以下为 pku3b_py 的标准使用流程，展示课程访问、模块内容下载、树结构调用等常见场景。
+- Encapsulates Rust interfaces into Python classes: e.g., `CourseDocumentHandle`, `CourseAnnouncementHandle`.
+- All content is unified into `CourseContentData`, facilitating AI model invocation and script processing.
+- Each content type supports:
+  - `.title()` / `.descriptions()` / `.download(path)` methods.
+  - Automatic file extension recognition and saving.
 
-### 🛜 登录教学网
+---
+
+### 🧪 Usage Examples (Python)
+
+The following demonstrates the standard workflow of `pku3b_py`, covering course access, module downloading, and tree structure navigation.
+
+### 🛜 Login to Blackboard
 
 ```python
 from pku3b_py import PyClient
 
 client = PyClient()
-bb = client.login_blackboard("学号", "密码")
+# Replace with your actual Student ID and Password
+bb = client.login_blackboard("student_id", "password")
 ```
 
-### 📚 列出课程并进入第一个课程
+### 📚 List Courses & Enter the First Course
 
 ```python
 course = bb.course(0)
-print("课程名:", course.title())
+print("Course Name:", course.title())
 ```
 
-### 🗂️ 获取课程左侧菜单 entries
+### 🗂️ Get Left Menu Entries
 
 ```python
 print(course.entries())
-# 返回如：{"教学资料": "/webapps/xx", "作业提交": "/webapps/yy"}
+# Returns e.g.: {"Course Materials": "/webapps/xx", "Assignments": "/webapps/yy"}
 ```
 
-### 📄 下载课程文档
+### 📄 Download Course Documents
 
 ```python
 docs = course.list_documents()
 for doc_handle in docs:
     doc = doc_handle.get()
     print(doc.title())
-    doc.download("./downloads/文档")
+    doc.download("./downloads/docs")
 ```
 
-### 📢 下载课程通知（含正文和附件）
+### 📢 Download Announcements (Body + Attachments)
 
 ```python
 anns = course.list_announcements()
 for ann_handle in anns:
     ann = ann_handle.get()
     print("📢", ann.title())
-    ann.download("./downloads/通知")
+    ann.download("./downloads/announcements")
 ```
 
-### 📝 下载课程作业附件并提交
+### 📝 Download Assignment Attachments & Submit
 
 ```python
 assignments = course.list_assignments()
 for assn_handle in assignments:
     assn = assn_handle.get()
     print("📝", assn.title())
-    assn.download("./downloads/作业")
-    # assn.submit_file("你的作业路径.pdf")
+    assn.download("./downloads/assignments")
+    # assn.submit_file("path/to/your/homework.pdf")
 ```
 
-### 🎬 下载课程视频（支持转 mp4）
+### 🎬 Download Videos (Support MP4 Conversion)
 
 ```python
 videos = course.list_videos()
 for video_handle in videos:
     video = video_handle.get()
     print("🎬", video.title())
-    video.download("./downloads/视频", to_mp4=True)
+    video.download("./downloads/videos", to_mp4=True)
 ```
 
-### 🌳 使用内容树精确定位模块
+### 🌳 Use Content Tree for Precise Navigation
 
 ```python
 tree = course.build_tree()
-root = tree  # 根节点
+root = tree  # Root node
 ```
 
-####  🔍 查找“课程通知”模块的 Entry 节点
+####  🔍 Find "Course Announcements" Node
 
 ```python
-target = root.find("课程通知")
+target = root.find("Course Announcements") # Name may vary based on course settings
 if target:
-    print("找到节点:", target.title())
+    print("Node Found:", target.title())
     for child in target.children():
-        print("📌 子节点:", child.title())
+        print("📌 Child Node:", child.title())
         ann = child.get_announcement_handle().get()
-        ann.download("./downloads/树状通知")
+        ann.download("./downloads/tree_announcements")
 ```
 
-你也可以访问其他模块，如文档、作业、视频：
+You can also access other modules like documents, assignments, and videos via the tree:
 
 ```python
-doc_node = root.find("教学资料").children()[0]
+doc_node = root.find("Course Materials").children()[0]
 doc = doc_node.get_document_handle().get()
-doc.download("./downloads/树状文档")
+doc.download("./downloads/tree_docs")
 
 video_node = root.find_by_kind("Video")[0]
 video = video_node.get_video_handle().get()
-video.download("./downloads/树状视频")
+video.download("./downloads/tree_videos")
 ```
 
 ---
 
-## 💻 前端交互界面：Cherry Studio + MCP 接入
+## 💻 Frontend Interface: Cherry Studio + MCP
 
-本项目前端采用 Cherry Studio 系统作为交互界面，通过 MCP 协议与工具后端进行连接与调用。用户可直接使用自然语言对话操作教学网资源，实现多轮对话、自动工具规划、结构化响应显示等能力。
+This project uses **Cherry Studio** as the frontend interaction interface, connecting to the backend via the **MCP Protocol**. Users can operate Blackboard resources directly using natural language, enabling capabilities like multi-turn dialogue, automatic tool planning, and structured response display.
 
-前端能力包括：
+**Frontend Capabilities:**
 
-模块 | 功能描述
------|------------
-🧠 多轮对话框架 | 支持与 LLM 进行连续对话，保持上下文
-⚙️ 工具自动调用 | 通过 MCP Schema 自动匹配并调用注册工具
-📊 结构化结果展示 | 对作业、文档、通知等响应格式美观呈现
-💬 模糊查询能力 | 支持关键词模糊匹配课程与作业
-🚀 流式响应体验 | 支持实时输出流式回答结果
-📁 下载与缓存支持 | 下载视频/文档后自动展示文件地址
+| Module | Description |
+|--------|-------------|
+| 🧠 Multi-turn Dialogue | Supports continuous conversation with LLMs, maintaining context. |
+| ⚙️ Auto Tool Calling | Automatically matches and calls registered tools via MCP Schema. |
+| 📊 Structured Display | Beautifully renders responses for assignments, documents, announcements, etc. |
+| 💬 Fuzzy Search | Supports keyword fuzzy matching for courses and assignments. |
+| 🚀 Streaming Response | Supports real-time streaming output of answers. |
+| 📁 Download & Cache | Automatically displays file paths after downloading videos/documents. |
 
-未来可拓展模块：
+**Future Modules:**
 
-模块 | 功能方向
------|------------
-📅 课程总览 | 所有课程结构/任务概览，支持时序视图和分类导航
-📋 作业任务面板 | 自动拉取所有作业 + 智能提醒（DDL 检测）
-🔔 通知聚合 | 聚合所有课程通知，按关键词/课程/时间分类筛选
-🧠 知识图谱生成器 | 结构化导入 Obsidian/Notion 笔记系统
+| Module | Direction |
+|--------|-----------|
+| 📅 Course Overview | Overview of all course structures/tasks, supporting timeline views. |
+| 📋 Task Dashboard | Auto-fetch all assignments + Smart reminders (DDL detection). |
+| 🔔 Notification Aggregator | Aggregate all course notifications, filtered by keyword/course/time. |
+| 🧠 Knowledge Graph | Structured import into Obsidian/Notion note systems. |
 
 ---
 
-## 🔧 安装与构建
+## 🔧 Installation & Build
 
+The system supports building from source to deploy the full interactive functionality, including the Python interface, MCP tool service, and frontend dialogue interface.
 
-本系统支持从源码构建并部署完整交互功能，包括 Python 接口、MCP 工具注册服务和前端对话界面。请按如下步骤进行：
-
-
-### 1️⃣ 克隆项目
+### 1️⃣ Clone Project
 
 ```bash
 git clone https://github.com/JKay15/pku3b_AI.git
 cd pku3b_ai
 ```
 
-### 2️⃣ 安装 Rust 与构建工具链
+### 2️⃣ Install Rust & Build Toolchain
 
 ```bash
-# 安装 Rust 工具链（首次安装）
+# Install Rust toolchain (if not installed)
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-# 重启终端后生效 rustc 和 cargo 命令
+# Restart terminal to enable rustc and cargo commands
 ```
 
-### 3️⃣ 安装 Python 依赖（包括构建器 maturin 和前端工具运行依赖）
+### 3️⃣ Install Python Dependencies
+
+Includes the builder `maturin` and frontend tool runtime dependencies.
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4️⃣ 构建 Python 模块（基于 maturin）
+### 4️⃣ Build Python Module (via Maturin)
 
 ```bash
 cd pku3b_py
-maturin develop  # 编译 Rust 模块并生成 Python 接口
+maturin develop  # Compiles Rust modules and generates Python interface
 cd ..
 ```
 
-### 5️⃣ 启动 MCP 工具服务
+### 5️⃣ Start MCP Tool Service
 
 ```bash
 python pku3b_ai/mcp_pku3b_server.py
 ```
 
-### 6️⃣ 启动 Cherry Studio 并配置 MCP Server
+### 6️⃣ Start Cherry Studio & Configure MCP Server
 
-在 Cherry Studio UI 中添加 MCP Server 设置，URL以运行mcp_pku3b_server.py后的终端输出为准：
+In the Cherry Studio UI, add the MCP Server settings. Use the URL output by the terminal after running `mcp_pku3b_server.py`.
 
 ![CleanShot 2025-06-27 at 21.59.39@2x.png](https://image-hosting-1319096909.cos.ap-beijing.myqcloud.com/CleanShot%202025-06-27%20at%2021.59.39%402x.png)
 
 ![CleanShot 2025-06-27 at 21.58.12@2x.png](https://image-hosting-1319096909.cos.ap-beijing.myqcloud.com/CleanShot%202025-06-27%20at%2021.58.12%402x.png)
 
-连接后即可使用自然语言对话调用系统功能（如下载作业、查看通知等）。
+Once connected, you can use natural language to invoke system functions (e.g., downloading assignments, checking announcements).
 
 ![CleanShot 2025-06-27 at 22.01.33@2x.png](https://image-hosting-1319096909.cos.ap-beijing.myqcloud.com/CleanShot%202025-06-27%20at%2022.01.33%402x.png)
 
+---
+
+## 📘 Documentation
+
+This project provides comprehensive and structured Python interface documentation:
+
+👉 [Python Library pku3b_py Usage Guide (doc/usage.md)](doc/usage.md)
+
+👉 [MCP Tool Summary (doc/mcp_tool_summary.md)](doc/mcp_tool_summary.md)
 
 ---
 
-## 📘 使用文档
+## 🤝 Acknowledgments
 
-本项目提供了完整、结构清晰的 Python 接口使用文档，详见：
+This project is based on the open-source project by a PKU student:
 
-👉 [Python库pku3b_py使用说明文档（doc/usage.md）](doc/usage.md)
+- 🌟 [sshwy/pku3b](https://github.com/sshwy/pku3b): A Blackboard CLI tool developed by a PKU student, featuring excellent resumable download and command-line interaction design.
 
-👉 [MCP工具集说明文档（doc/mcp_tool_summary.md）](doc/mcp_tool_summary.md)
-
-
----
-
-## 🤝 致谢原项目
-
-本项目基于北大开源项目：
-
-- 🌟 [sshwy/pku3b](https://github.com/sshwy/pku3b)：由北大学生开发的教学网 CLI 工具，具备优秀的断点下载与命令行交互设计。
-
-我们复用了其**后端通信与视频作业模块**，并在此基础上：
-- ✨ 实现了**完整文档与通知模块**
-- ✨ 建立了结构化**内容统一数据抽象层**
-- ✨ 提供了 **Python 封装接口**，可供 AI 系统调用
-
----
-
-
+We reused its **backend communication and video/assignment modules** and extended it with:
+- ✨ **Complete document and announcement modules.**
+- ✨ **Unified data abstraction layer for structured content.**
+- ✨ **Python encapsulation interface** for AI system integration.
